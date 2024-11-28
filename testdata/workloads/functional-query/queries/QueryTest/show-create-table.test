@@ -17,7 +17,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test1 (
 )
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # Simple JSON table
@@ -73,7 +73,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.json_test1 (
 )
 STORED AS JSONFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # simple table with all types
@@ -129,7 +129,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test2 (
 )
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # all types and partitioned
@@ -203,7 +203,7 @@ PARTITIONED BY (
 COMMENT 'This is a test'
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # With a table comment
@@ -232,7 +232,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test4 (
 COMMENT 'This is a test'
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # With the row format specified
@@ -265,7 +265,7 @@ WITH SERDEPROPERTIES ('line.delim'='\n', 'field.delim'=',',
                       'serialization.format'=',', 'escape.delim'='\\')
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # testing with parquet specified
@@ -291,7 +291,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test6 (
 )
 STORED AS PARQUET
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # with extra table properties and sequencefile
@@ -345,7 +345,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test8 (
 )
 STORED AS RCFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 # Test create table as select
@@ -401,7 +401,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test_as_select (
 )
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- CREATE_TABLE
 create table i_1687_p partitioned by (int_col) as
@@ -424,7 +424,7 @@ PARTITIONED BY (
 )
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ====
 ---- QUERY
 SHOW CREATE TABLE functional.allcomplextypes
@@ -530,7 +530,7 @@ CREATE EXTERNAL TABLE show_create_table_test_db.test1 (id INT)
 SORT BY LEXICAL (id)
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ---- RESULTS-HIVE
 CREATE TABLE show_create_table_test_db.test1 (id INT)
 SORT BY LEXICAL (id)
@@ -549,7 +549,7 @@ PARTITIONED BY (x INT, y INT)
 SORT BY LEXICAL (id)
 STORED AS TEXTFILE
 LOCATION '$$location_uri$$'
-TBLPROPERTIES ('external.table.purge'='TRUE')
+TBLPROPERTIES ('TRANSLATED_TO_EXTERNAL'='TRUE', 'external.table.purge'='TRUE')
 ---- RESULTS-HIVE
 CREATE TABLE show_create_table_test_db.test1 (id INT)
 PARTITIONED BY (x INT, y INT)
