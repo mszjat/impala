@@ -1,0 +1,14 @@
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS gbk_huge;
+CREATE TABLE gbk_huge (
+  name1 string, name2 string, name3 string, name4 string, name5 string
+  ) STORED AS TEXTFILE;
+ALTER TABLE gbk_huge SET SERDEPROPERTIES('serialization.encoding'='gbk');
+REFRESH gbk_huge;
+INSERT OVERWRITE TABLE gbk_huge SELECT * FROM functional.gbk_huge_utf8;
+(select * from functional.gbk_huge_utf8 except select * from gbk_huge)
+union (select * from gbk_huge except select * from functional.gbk_huge_utf8)
+---- RESULTS
+=====

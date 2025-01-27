@@ -1,0 +1,116 @@
+====
+---- QUERY
+USE $DATABASE;
+CREATE TABLE alltypes_gbk (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp,
+  year int,
+  month int)
+STORED AS TEXTFILE;
+ALTER TABLE alltypes_gbk SET SERDEPROPERTIES('serialization.encoding'='gbk');
+REFRESH alltypes_gbk;
+INSERT OVERWRITE TABLE alltypes_gbk SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month FROM functional.alltypes;
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month from functional.alltypes 
+except select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month from alltypes_gbk;
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+CREATE TABLE alltypes_latin1 (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp,
+  year int,
+  month int)
+STORED AS TEXTFILE;
+ALTER TABLE alltypes_latin1 SET SERDEPROPERTIES('serialization.encoding'='ISO-8859-1');
+REFRESH alltypes_latin1;
+INSERT OVERWRITE TABLE alltypes_latin1 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month FROM functional.alltypes;
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month from functional.alltypes 
+except select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month from alltypes_latin1;
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+CREATE TABLE alltypes_shift_jis (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp,
+  year int,
+  month int)
+STORED AS TEXTFILE;
+ALTER TABLE alltypes_shift_jis SET SERDEPROPERTIES('serialization.encoding'='Shift_JIS');
+REFRESH alltypes_shift_jis;
+INSERT OVERWRITE TABLE alltypes_shift_jis SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month FROM functional.alltypes;
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month from functional.alltypes 
+except select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month from alltypes_shift_jis;
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+CREATE TABLE alltypes_cp1251 (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp,
+  year int,
+  month int)
+STORED AS TEXTFILE;
+ALTER TABLE alltypes_cp1251 SET SERDEPROPERTIES('serialization.encoding'='windows-1251');
+REFRESH alltypes_cp1251;
+INSERT OVERWRITE TABLE alltypes_cp1251 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month FROM functional.alltypes;
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month from functional.alltypes 
+except select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month from alltypes_cp1251;
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+CREATE TABLE alltypes_koi8r (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  date_string_col string,
+  string_col string,
+  timestamp_col timestamp,
+  year int,
+  month int)
+STORED AS TEXTFILE;
+ALTER TABLE alltypes_koi8r SET SERDEPROPERTIES('serialization.encoding'='KOI8-R');
+REFRESH alltypes_koi8r;
+INSERT OVERWRITE TABLE alltypes_koi8r SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month FROM functional.alltypes;
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month from functional.alltypes 
+except select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, date_string_col, string_col, timestamp_col, year, month from alltypes_koi8r;
+---- RESULTS
+=====

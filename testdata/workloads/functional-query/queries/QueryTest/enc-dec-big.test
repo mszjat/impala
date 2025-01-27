@@ -1,0 +1,66 @@
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS gbk_big;
+CREATE TABLE gbk_big (
+  name1 string, name2 string, name3 string, name4 string, name5 string
+  ) STORED AS TEXTFILE;
+ALTER TABLE gbk_big SET SERDEPROPERTIES('serialization.encoding'='gbk');
+REFRESH gbk_big;
+INSERT OVERWRITE TABLE gbk_big SELECT * FROM functional.gbk_big_utf8;
+(select * from functional.gbk_big_utf8 except select * from gbk_big)
+union (select * from gbk_big except select * from functional.gbk_big_utf8)
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS cp1251_big;
+CREATE TABLE cp1251_big (
+  name1 string, name2 string, name3 string, name4 string, name5 string
+  ) STORED AS TEXTFILE;
+ALTER TABLE cp1251_big SET SERDEPROPERTIES('serialization.encoding'='cp1251');
+REFRESH cp1251_big;
+INSERT OVERWRITE TABLE cp1251_big SELECT * FROM functional.cp1251_big_utf8;
+(select * from functional.cp1251_big_utf8 except select * from cp1251_big)
+union (select * from cp1251_big except select * from functional.cp1251_big_utf8)
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS latin1_big;
+CREATE TABLE latin1_big (
+  name1 string, name2 string, name3 string, name4 string, name5 string
+  ) STORED AS TEXTFILE;
+ALTER TABLE latin1_big SET SERDEPROPERTIES('serialization.encoding'='latin1');
+REFRESH latin1_big;
+INSERT OVERWRITE TABLE latin1_big SELECT * FROM functional.latin1_big_utf8;
+(select * from functional.latin1_big_utf8 except select * from latin1_big)
+union (select * from latin1_big except select * from functional.latin1_big_utf8)
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS shift_jis_big;
+CREATE TABLE shift_jis_big (
+  name1 string, name2 string, name3 string, name4 string, name5 string
+  ) STORED AS TEXTFILE;
+ALTER TABLE shift_jis_big SET SERDEPROPERTIES('serialization.encoding'='shift_jis');
+REFRESH shift_jis_big;
+INSERT OVERWRITE TABLE shift_jis_big SELECT * FROM functional.shift_jis_big_utf8;
+(select * from functional.shift_jis_big_utf8 except select * from shift_jis_big)
+union (select * from shift_jis_big except select * from functional.shift_jis_big_utf8)
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS koi8r_big;
+CREATE TABLE koi8r_big (
+  name1 string, name2 string, name3 string, name4 string, name5 string
+  ) STORED AS TEXTFILE;
+ALTER TABLE koi8r_big SET SERDEPROPERTIES('serialization.encoding'='koi8-r');
+REFRESH koi8r_big;
+INSERT OVERWRITE TABLE koi8r_big SELECT * FROM functional.koi8r_big_utf8;
+(select * from functional.koi8r_big_utf8 except select * from koi8r_big)
+union (select * from koi8r_big except select * from functional.koi8r_big_utf8)
+---- RESULTS
+=====

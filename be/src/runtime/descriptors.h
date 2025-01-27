@@ -399,6 +399,7 @@ class HdfsPartitionDescriptor {
   char escape_char() const { return escape_char_; }
   THdfsFileFormat::type file_format() const { return file_format_; }
   int block_size() const { return block_size_; }
+  std::string encoding_value() const { return encoding_value_; }
   const std::string& location() const { return location_; }
   int64_t id() const { return id_; }
   std::string DebugString() const;
@@ -418,6 +419,7 @@ class HdfsPartitionDescriptor {
   char collection_delim_;
   char escape_char_;
   int block_size_;
+  std::string encoding_value_;
   // TODO: use the same representation as the Catalog does, in which common prefixes are
   // stripped.
   std::string location_;
@@ -447,6 +449,7 @@ class HdfsTableDescriptor : public TableDescriptor {
     return null_partition_key_value_;
   }
   const std::string& null_column_value() const { return null_column_value_; }
+
   const std::string& avro_schema() const { return avro_schema_; }
 
   typedef std::map<int64_t, HdfsPartitionDescriptor*> PartitionIdToDescriptorMap;

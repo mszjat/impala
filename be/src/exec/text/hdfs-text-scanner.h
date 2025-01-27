@@ -29,6 +29,7 @@ template<bool>
 class DelimitedTextParser;
 class ScannerContext;
 struct HdfsFileDesc;
+class CharCodec;
 
 /// HdfsScanner implementation that understands text-formatted records.
 /// Uses SSE instructions, if available, for performance.
@@ -175,7 +176,8 @@ class HdfsTextScanner : public HdfsScanner {
   /// decompression functions DecompressFileToBuffer()/DecompressStreamToBuffer().
   /// If applicable, attaches decompression buffers from previous calls that might still
   /// be referenced by returned batches to 'pool'. If 'pool' is nullptr the buffers are
-  /// freed instead.
+  /// freed instead. In case of decoding calls decoder_->DecodeBuffer() which overwrites
+  /// the byte_buffer_ptr_ with decoded data on data_buffer_pool_.
   ///
   /// Subclasses can override this function to implement different behaviour.
   /// TODO: IMPALA-6146: rethink this interface - having subclasses modify member
@@ -265,6 +267,9 @@ class HdfsTextScanner : public HdfsScanner {
 
   /// Time parsing text files
   RuntimeProfile::Counter* parse_delimiter_timer_;
+
+  /// For non-utf8 text files
+  boost::scoped_ptr<CharCodec> decoder_;
 };
 
 }

@@ -29,6 +29,19 @@ table_name:insert_overwrite_nopart, constraint:restrict_to, table_format:text/no
 table_name:insert_overwrite_partitioned, constraint:restrict_to, table_format:text/none/none
 table_name:insert_string_partitioned, constraint:restrict_to, table_format:text/none/none
 
+table_name:alltypes_nopart_encoded_gbk_nopart, constraint:restrict_to, table_format:text/none/none
+table_name:gbk_names_utf8, constraint:restrict_to, table_format:text/none/none
+table_name:cp1251_names_utf8, constraint:restrict_to, table_format:text/none/none
+table_name:latin1_names_utf8, constraint:restrict_to, table_format:text/none/none
+table_name:shift_jis_names_utf8, constraint:restrict_to, table_format:text/none/none
+table_name:koi8r_names_utf8, constraint:restrict_to, table_format:text/none/none
+table_name:gbk_big_utf8, constraint:restrict_to, table_format:text/none/none
+table_name:cp1251_big_utf8, constraint:restrict_to, table_format:text/none/none
+table_name:latin1_big_utf8, constraint:restrict_to, table_format:text/none/none
+table_name:shift_jis_big_utf8, constraint:restrict_to, table_format:text/none/none
+table_name:koi8r_big_utf8, constraint:restrict_to, table_format:text/none/none
+
+
 table_name:alltypesinsert, constraint:restrict_to, table_format:parquet/none/none
 table_name:alltypesnopart_insert, constraint:restrict_to, table_format:parquet/none/none
 table_name:insert_overwrite_nopart, constraint:restrict_to, table_format:parquet/none/none

@@ -322,7 +322,8 @@ class HdfsScanner {
   THdfsCompression::type decompression_type_ = THdfsCompression::NONE;
 
   /// Pool to allocate per data block memory.  This should be used with the
-  /// decompressor and any other per data block allocations.
+  /// decompressor and any other per data block allocations.  In case of decoding it
+  /// contains resulting decocoded data.
   boost::scoped_ptr<MemPool> data_buffer_pool_;
 
   /// Offsets of string slots in the result tuple that may need to be copied as part of

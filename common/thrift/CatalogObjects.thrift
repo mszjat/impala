@@ -356,6 +356,7 @@ struct THdfsStorageDescriptor {
   6: required byte quoteChar
   7: required THdfsFileFormat fileFormat
   8: required i32 blockSize
+  9: optional string encodingValue
 }
 
 // Represents an HDFS partition

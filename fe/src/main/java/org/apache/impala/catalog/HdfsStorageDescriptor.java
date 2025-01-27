@@ -89,6 +89,7 @@ public class HdfsStorageDescriptor {
   private final byte escapeChar_;
   private final byte quoteChar_;
   private final int blockSize_;
+  private String encodingValue_ = null;
 
   /**
    * Returns a map from delimiter key to a single delimiter character,
@@ -165,7 +166,7 @@ public class HdfsStorageDescriptor {
 
   private HdfsStorageDescriptor(String tblName, HdfsFileFormat fileFormat, byte lineDelim,
       byte fieldDelim, byte collectionDelim, byte mapKeyDelim, byte escapeChar,
-      byte quoteChar, int blockSize) {
+      byte quoteChar, int blockSize, String encodingValue) {
     this.fileFormat_ = fileFormat;
     this.lineDelim_ = lineDelim;
     this.fieldDelim_ = fieldDelim;
@@ -173,6 +174,7 @@ public class HdfsStorageDescriptor {
     this.mapKeyDelim_ = mapKeyDelim;
     this.quoteChar_ = quoteChar;
     this.blockSize_ = blockSize;
+    this.encodingValue_ = encodingValue;
 
     // You can set the escape character as a tuple or row delim.  Empirically,
     // this is ignored by hive.
@@ -226,6 +228,8 @@ public class HdfsStorageDescriptor {
       blockSize = Integer.parseInt(blockValue);
     }
 
+    String encodingValue = parameters.get(serdeConstants.SERIALIZATION_ENCODING);
+
     try {
       return INTERNER.intern(new HdfsStorageDescriptor(tblName,
           HdfsFileFormat.fromJavaClassName(
@@ -236,7 +240,7 @@ public class HdfsStorageDescriptor {
           delimMap.get(serdeConstants.MAPKEY_DELIM),
           delimMap.get(serdeConstants.ESCAPE_CHAR),
           delimMap.get(serdeConstants.QUOTE_CHAR),
-          blockSize));
+          blockSize, encodingValue));
     } catch (IllegalArgumentException ex) {
       // Thrown by fromJavaClassName
       throw new InvalidStorageDescriptorException(ex);
@@ -248,18 +252,23 @@ public class HdfsStorageDescriptor {
     return INTERNER.intern(new HdfsStorageDescriptor(tableName,
         HdfsFileFormat.fromThrift(tDesc.getFileFormat()), tDesc.lineDelim,
         tDesc.fieldDelim, tDesc.collectionDelim, tDesc.mapKeyDelim, tDesc.escapeChar,
-        tDesc.quoteChar, tDesc.blockSize));
+        tDesc.quoteChar, tDesc.blockSize, tDesc.encodingValue));
   }
 
   public THdfsStorageDescriptor toThrift() {
-    return new THdfsStorageDescriptor(lineDelim_, fieldDelim_, collectionDelim_,
-        mapKeyDelim_, escapeChar_, quoteChar_, fileFormat_.toThrift(), blockSize_);
+    THdfsStorageDescriptor tHdfsStorageDescriptor = new THdfsStorageDescriptor(
+        lineDelim_, fieldDelim_, collectionDelim_, mapKeyDelim_, escapeChar_, quoteChar_,
+        fileFormat_.toThrift(), blockSize_);
+    if (encodingValue_ != null) {
+      tHdfsStorageDescriptor.setEncodingValue(encodingValue_);
+    }
+    return tHdfsStorageDescriptor;
   }
 
   public HdfsStorageDescriptor cloneWithChangedFileFormat(HdfsFileFormat newFormat) {
     return INTERNER.intern(new HdfsStorageDescriptor(
         "<unknown>", newFormat, lineDelim_, fieldDelim_, collectionDelim_, mapKeyDelim_,
-        escapeChar_, quoteChar_, blockSize_));
+        escapeChar_, quoteChar_, blockSize_, encodingValue_));
   }
 
   public byte getLineDelim() { return lineDelim_; }
@@ -269,11 +278,12 @@ public class HdfsStorageDescriptor {
   public byte getEscapeChar() { return escapeChar_; }
   public HdfsFileFormat getFileFormat() { return fileFormat_; }
   public int getBlockSize() { return blockSize_; }
+  public String getEncodingValue() { return encodingValue_; }
 
   @Override
   public int hashCode() {
     return Objects.hash(blockSize_, collectionDelim_, escapeChar_, fieldDelim_,
-        fileFormat_, lineDelim_, mapKeyDelim_, quoteChar_);
+        fileFormat_, lineDelim_, mapKeyDelim_, quoteChar_, encodingValue_);
   }
 
   @Override
@@ -290,6 +300,7 @@ public class HdfsStorageDescriptor {
     if (lineDelim_ != other.lineDelim_) return false;
     if (mapKeyDelim_ != other.mapKeyDelim_) return false;
     if (quoteChar_ != other.quoteChar_) return false;
+    if (encodingValue_ != other.encodingValue_) return false;
     return true;
   }
 }

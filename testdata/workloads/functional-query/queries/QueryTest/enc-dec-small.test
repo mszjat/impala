@@ -1,0 +1,56 @@
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS gbk_names;
+CREATE TABLE gbk_names (name string) STORED AS TEXTFILE;
+ALTER TABLE gbk_names SET SERDEPROPERTIES('serialization.encoding'='gbk');
+REFRESH gbk_names;
+INSERT OVERWRITE TABLE gbk_names SELECT name FROM functional.gbk_names_utf8;
+(select * from functional.gbk_names_utf8 except select * from gbk_names)
+union (select * from gbk_names except select * from functional.gbk_names_utf8)
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS cp1251_names;
+CREATE TABLE cp1251_names (name string) STORED AS TEXTFILE;
+ALTER TABLE cp1251_names SET SERDEPROPERTIES('serialization.encoding'='cp1251');
+REFRESH cp1251_names;
+INSERT OVERWRITE TABLE cp1251_names SELECT name FROM functional.cp1251_names_utf8;
+(select * from functional.cp1251_names_utf8 except select * from cp1251_names)
+union (select * from cp1251_names except select * from functional.cp1251_names_utf8)
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS latin1_names;
+CREATE TABLE latin1_names (name string) STORED AS TEXTFILE;
+ALTER TABLE latin1_names SET SERDEPROPERTIES('serialization.encoding'='latin1');
+REFRESH latin1_names;
+INSERT OVERWRITE TABLE latin1_names SELECT name FROM functional.latin1_names_utf8;
+(select * from functional.latin1_names_utf8 except select * from latin1_names)
+union (select * from latin1_names except select * from functional.latin1_names_utf8)
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS shift_jis_names;
+CREATE TABLE shift_jis_names (name string) STORED AS TEXTFILE;
+ALTER TABLE shift_jis_names SET SERDEPROPERTIES('serialization.encoding'='shift_jis');
+REFRESH shift_jis_names;
+INSERT OVERWRITE TABLE shift_jis_names SELECT name FROM functional.shift_jis_names_utf8;
+(select * from functional.shift_jis_names_utf8 except select * from shift_jis_names)
+union (select * from shift_jis_names except select * from functional.shift_jis_names_utf8)
+---- RESULTS
+=====
+---- QUERY
+USE $DATABASE;
+DROP TABLE IF EXISTS koi8r_names;
+CREATE TABLE koi8r_names (name string) STORED AS TEXTFILE;
+ALTER TABLE koi8r_names SET SERDEPROPERTIES('serialization.encoding'='koi8-r');
+REFRESH koi8r_names;
+INSERT OVERWRITE TABLE koi8r_names SELECT name FROM functional.koi8r_names_utf8;
+(select * from functional.koi8r_names_utf8 except select * from koi8r_names)
+union (select * from koi8r_names except select * from functional.koi8r_names_utf8)
+---- RESULTS
+=====

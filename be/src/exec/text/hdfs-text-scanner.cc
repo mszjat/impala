@@ -55,6 +55,7 @@
 #include "util/error-util.h"
 #include "util/runtime-profile-counters.h"
 #include "util/stopwatch.h"
+#include "util/char-codec.h"
 
 #include "common/names.h"
 
@@ -248,6 +249,12 @@ Status HdfsTextScanner::InitNewRange() {
   text_converter_.reset(new TextConverter(hdfs_partition->escape_char(),
       scan_node_->hdfs_table()->null_column_value(), true,
       state_->strict_mode()));
+
+  auto encoding = hdfs_partition->encoding_value();
+  if (!encoding.empty() && encoding != "UTF-8") {
+    decoder_.reset(new CharCodec(data_buffer_pool_.get(), encoding,
+        hdfs_partition->line_delim()));
+  }
 
   RETURN_IF_ERROR(ResetScanner());
   scan_state_ = SCAN_RANGE_INITIALIZED;
@@ -533,6 +540,14 @@ Status HdfsTextScanner::FillByteBuffer(MemPool* pool, bool* eosr, int num_bytes)
     RETURN_IF_ERROR(DecompressFileToBuffer(reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
         &byte_buffer_read_size_));
     *eosr = byte_buffer_read_size_ == 0 ? true : stream_->eosr();
+  }
+
+  if (decoder_.get() != nullptr) {
+    RETURN_IF_ERROR(decoder_->DecodeBuffer(reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
+        &byte_buffer_read_size_));
+    if (decompressor_.get() == nullptr) {
+      context_->ReleaseCompletedResources(false);
+    }
   }
 
   byte_buffer_end_ = byte_buffer_ptr_ + byte_buffer_read_size_;

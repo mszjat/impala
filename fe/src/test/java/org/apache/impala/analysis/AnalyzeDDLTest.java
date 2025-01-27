@@ -1065,6 +1065,40 @@ public class AnalyzeDDLTest extends FrontendTestBase {
     // Cannot ALTER TABLE SET on an HBase table.
     AnalysisError("alter table functional_hbase.alltypes set tblproperties('a'='b')",
         "ALTER TABLE SET not currently supported on HBase tables.");
+
+    // serialization.encoding
+    AnalyzesOk("alter table functional.alltypes set serdeproperties(" +
+        "'serialization.encoding'='GBK')");
+    AnalyzesOk("alter table functional.text_dollar_hash_pipe set serdeproperties(" +
+        "'serialization.encoding'='GBK')");
+    AnalyzesOk("alter table functional.alltypes partition(year=2010, month=12) " +
+        "set serdeproperties('serialization.encoding'='GBK')");
+
+    String [] unsupportedFileFormatDbs =
+      {"functional_parquet", "functional_rc", "functional_avro"};
+    for (String format: unsupportedFileFormatDbs) {
+      AnalysisError("alter table " + format + ".alltypes set serdeproperties(" +
+          "'serialization.encoding'='GBK')", "Property SERIALIZATION.ENCODING is only " +
+          "supported on TEXT or SEQUENCE file formats");
+    }
+    AnalysisError("alter table functional_kudu.alltypes set serdeproperties( " +
+        "'serialization.encoding'='GBK')", "Property SERIALIZATION.ENCODING is only " +
+        "supported on HDFS tables");
+    AnalysisError("alter table functional.alltypesmixedformat partition(year=2009) " +
+        "set serdeproperties('serialization.encoding'='GBK')", "Property " +
+        "SERIALIZATION.ENCODING is only supported on TEXT or SEQUENCE file formats");
+
+    AnalysisError("alter table functional.alltypes set serdeproperties(" +
+        "'serialization.encoding'='UTF-16')",
+        "Property SERIALIZATION.ENCODING only supports encodings in which line " +
+        "delimiter is compatible with ASCII.");
+    AnalysisError("alter table functional.alltypes partition(year=2010, month=12) " +
+        "set serdeproperties('serialization.encoding'='UTF-16')",
+        "Property SERIALIZATION.ENCODING only supports encodings in which line " +
+        "delimiter is compatible with ASCII.");
+    AnalysisError("alter table functional.alltypes set serdeproperties(" +
+        "'serialization.encoding'='NonexistentEncoding')",
+        "Unsupported encoding: NonexistentEncoding.");
   }
 
   @Test

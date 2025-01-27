@@ -1,0 +1,9 @@
+====
+---- QUERY
+(select * from functional.alltypes_nopart_encoded_gbk_nopart
+except select * from functional.alltypes)
+union 
+(select * from functional.alltypes 
+except select * from functional.alltypes_nopart_encoded_gbk_nopart)
+---- RESULTS
+====

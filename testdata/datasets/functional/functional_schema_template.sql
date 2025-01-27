@@ -4767,3 +4767,159 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (
 )
 PARTITION BY HASH (tkey) PARTITIONS 3 STORED AS KUDU;
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+alltypes_nopart_encoded_gbk_nopart
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+year int
+month int
+---- ALTER
+ALTER TABLE {table_name} SET SERDEPROPERTIES('serialization.encoding'='GBK');
+---- DEPENDENT_LOAD_HIVE
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+  double_col, date_string_col, string_col, timestamp_col, year, month
+FROM {db_name}.alltypes
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+gbk_names_utf8
+---- COLUMNS
+name string
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/charcodec/gbk_names_utf8.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+cp1251_names_utf8
+---- COLUMNS
+name string
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/charcodec/cp1251_names_utf8.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+latin1_names_utf8
+---- COLUMNS
+name string
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/charcodec/latin1_names_utf8.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+shift_jis_names_utf8
+---- COLUMNS
+name string
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/charcodec/shift_jis_names_utf8.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+koi8r_names_utf8
+---- COLUMNS
+name string
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/charcodec/koi8r_names_utf8.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+gbk_big_utf8
+---- COLUMNS
+name1 string
+name2 string
+name3 string
+name4 string
+name5 string
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/charcodec/gbk_big_utf8.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+cp1251_big_utf8
+---- COLUMNS
+name1 string
+name2 string
+name3 string
+name4 string
+name5 string
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/charcodec/cp1251_big_utf8.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+latin1_big_utf8
+---- COLUMNS
+name1 string
+name2 string
+name3 string
+name4 string
+name5 string
+---- ROW_FORMAT
+delimited fields terminated by ',' escaped by '\\'
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/charcodec/latin1_big_utf8.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+shift_jis_big_utf8
+---- COLUMNS
+name1 string
+name2 string
+name3 string
+name4 string
+name5 string
+---- ROW_FORMAT
+delimited fields terminated by ',' escaped by '\\'
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/charcodec/shift_jis_big_utf8.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+koi8r_big_utf8
+---- COLUMNS
+name1 string
+name2 string
+name3 string
+name4 string
+name5 string
+---- ROW_FORMAT
+delimited fields terminated by ',' escaped by '\\'
+---- LOAD
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/charcodec/koi8r_big_utf8.txt'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====

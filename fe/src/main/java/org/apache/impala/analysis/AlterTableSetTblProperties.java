@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.apache.avro.SchemaParseException;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.mr.Catalogs;
@@ -30,11 +31,14 @@ import org.apache.iceberg.mr.InputFormatConfig;
 import org.apache.impala.authorization.AuthorizationConfig;
 import org.apache.impala.catalog.DataSourceTable;
 import org.apache.impala.catalog.FeDataSourceTable;
+import org.apache.impala.catalog.FeFsPartition;
 import org.apache.impala.catalog.FeFsTable;
 import org.apache.impala.catalog.FeHBaseTable;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeKuduTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.HdfsFileFormat;
+import org.apache.impala.catalog.HdfsStorageDescriptor;
 import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.KuduTable;
 import org.apache.impala.catalog.TableLoadingException;
@@ -50,12 +54,15 @@ import org.apache.impala.util.AvroSchemaParser;
 import org.apache.impala.util.AvroSchemaUtils;
 import org.apache.impala.util.IcebergUtil;
 import org.apache.impala.util.MetaStoreUtil;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Longs;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
 * Represents an ALTER TABLE SET [PARTITION ('k1'='a', 'k2'='b'...)]
@@ -134,6 +141,9 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
 
     // Analyze 'sort.columns' property.
     analyzeSortColumns(getTargetTable(), tblProperties_);
+
+    // Analyze 'serialization.encoding' property
+    analyzeSerializationEncoding(tblProperties_);
   }
 
   private void analyzeKuduTable(Analyzer analyzer) throws AnalysisException {
@@ -265,6 +275,96 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
           "Error parsing Avro schema for table '%s': %s", table_.getFullName(),
           e.getMessage()));
     }
+  }
+
+  /**
+   * Analyzes the 'serialization.encoding' property in 'tblProperties' to check if its
+   * line delimiter is compatible with ASCII, since multi-byte line delimiters are not
+   * supported.
+   */
+  public void analyzeSerializationEncoding(Map<String, String> tblProperties)
+        throws AnalysisException {
+    if (!tblProperties.containsKey(serdeConstants.SERIALIZATION_ENCODING)) {
+      return;
+    }
+
+    FeTable tbl = getTargetTable();
+    if (!(tbl instanceof FeFsTable)) {
+      throw new AnalysisException(String.format("Property SERIALIZATION.ENCODING is only "
+          + "supported on HDFS tables. Conflicting table: %1$s", tbl.getFullName()));
+    }
+
+    if (tbl instanceof FeIcebergTable) {
+      throw new AnalysisException("Property SERIALIZATION.ENCODING is not supported " +
+          "on Iceberg tables: " + tbl.getFullName());
+    }
+
+    if (partitionSet_ != null) {
+      for (FeFsPartition partition: partitionSet_.getPartitions()) {
+        if (partition.getFileFormat() != HdfsFileFormat.TEXT &&
+            partition.getFileFormat() != HdfsFileFormat.SEQUENCE_FILE) {
+          throw new AnalysisException(String.format("Property SERIALIZATION.ENCODING is "
+              + "only supported on TEXT or SEQUENCE file formats.  "
+              + "Conflicting partition/format: %1$s / %2$s",
+              partition.getPartitionName(), partition.getFileFormat().name()));
+        }
+      }
+    } else {
+      StorageDescriptor sd = ((FeFsTable) tbl).getMetaStoreTable().getSd();
+      HdfsFileFormat format = HdfsFileFormat.fromHdfsInputFormatClass(
+              sd.getInputFormat(), sd.getSerdeInfo().getSerializationLib());
+      if (format != HdfsFileFormat.TEXT &&
+          format != HdfsFileFormat.SEQUENCE_FILE) {
+        throw new AnalysisException(String.format("Property SERIALIZATION.ENCODING is " +
+            "only supported on TEXT or SEQUENCE file formats. Conflicting " +
+            "table/format: %1$s / %2$s", tbl.getFullName(), format.name()));
+      }
+    }
+
+    String encoding = tblProperties.get(serdeConstants.SERIALIZATION_ENCODING);
+    if (!Charset.isSupported(encoding)) {
+      throw new AnalysisException("Unsupported encoding: " + encoding + ".");
+    }
+
+    Charset charset = Charset.forName(encoding);
+    if (partitionSet_ != null) {
+      for (FeFsPartition partition : partitionSet_.getPartitions()) {
+        if (!isLineDelimiterSameAsAscii(
+            partition.getInputFormatDescriptor().getLineDelim(), charset)) {
+          throw new AnalysisException(String.format(
+              "Property SERIALIZATION.ENCODING only supports " +
+              "encodings in which line delimiter is compatible with ASCII. " +
+              "Conflicting partition: %1$s. " +
+              "Please refer to Jira ticket IMPALA-10319 for more info.",
+              partition.getPartitionName()));
+        }
+      }
+    } else {
+      StorageDescriptor sd = ((FeFsTable) tbl).getMetaStoreTable().getSd();
+      HdfsStorageDescriptor hdfsSD;
+      try {
+        hdfsSD = HdfsStorageDescriptor.fromStorageDescriptor(tbl.getName(), sd);
+      } catch (HdfsStorageDescriptor.InvalidStorageDescriptorException e) {
+        throw new AnalysisException(String.format(
+            "Error parsing serialization.encoding for table: %1$s. ",
+            table_.getFullName()));
+      }
+      if (!isLineDelimiterSameAsAscii(hdfsSD.getLineDelim(), charset)) {
+        throw new AnalysisException(String.format(
+            "Property SERIALIZATION.ENCODING only supports " +
+            "encodings in which line delimiter is compatible with ASCII. " +
+            "Conflicting table: %1$s. " +
+            "Please refer to Jira ticket IMPALA-10319 for more info.",
+            table_.getFullName()));
+      }
+    }
+  }
+
+  public static boolean isLineDelimiterSameAsAscii(byte lineDelim, Charset charset) {
+    String lineDelimStr = new String(new byte[]{lineDelim}, charset);
+    byte[] newlineBytesInEncoding = lineDelimStr.getBytes(charset);
+    byte[] newlineBytesInAscii = lineDelimStr.getBytes(StandardCharsets.US_ASCII);
+    return java.util.Arrays.equals(newlineBytesInEncoding, newlineBytesInAscii);
   }
 
   /**

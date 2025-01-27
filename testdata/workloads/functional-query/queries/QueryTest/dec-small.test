@@ -1,0 +1,51 @@
+====
+---- QUERY
+USE $DATABASE;
+select name from gbk_names;
+---- RESULTS: RAW_STRING
+'张三'
+'李四'
+'王五'
+---- TYPES
+STRING
+====
+---- QUERY
+USE $DATABASE;
+select name from latin1_names;
+---- RESULTS: RAW_STRING
+'José'
+'François'
+'Göran'
+---- TYPES
+STRING
+====
+---- QUERY
+USE $DATABASE;
+select name from shift_jis_names;
+---- RESULTS: RAW_STRING
+'山田太郎'
+'佐藤花子'
+'鈴木次郎'
+---- TYPES
+STRING
+====
+---- QUERY
+USE $DATABASE;
+select name from cp1251_names;
+---- RESULTS: RAW_STRING
+'Алексей'
+'Мария'
+'Дмитрий'
+---- TYPES
+STRING
+====
+---- QUERY
+USE $DATABASE;
+select name from koi8r_names;
+---- RESULTS: RAW_STRING
+'Алексей'
+'Мария'
+'Дмитрий'
+---- TYPES
+STRING≤
+====
