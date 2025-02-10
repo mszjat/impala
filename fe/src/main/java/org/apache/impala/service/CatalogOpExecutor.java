@@ -2821,8 +2821,10 @@ public class CatalogOpExecutor {
         msTbl.getParameters().remove(StatsSetupConst.ROW_COUNT) != null;
     boolean droppedTotalSize =
         msTbl.getParameters().remove(StatsSetupConst.TOTAL_SIZE) != null;
+    boolean droppedLastCompute =
+        msTbl.getParameters().remove(HdfsTable.TBL_PROP_LAST_COMPUTE_STATS_TIME) != null;
 
-    if (droppedRowCount || droppedTotalSize) {
+    if (droppedRowCount || droppedTotalSize || droppedLastCompute) {
       applyAlterTable(msTbl, false, null, catalogTimeline);
       ++numTargetedPartitions;
     }
