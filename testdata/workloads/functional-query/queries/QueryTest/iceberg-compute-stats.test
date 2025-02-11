@@ -260,13 +260,6 @@ drop stats ice_alltypes_ht;
 STRING
 ====
 ---- QUERY
-alter table ice_alltypes_ht unset tblproperties('impala.lastComputeStatsTime');
----- RESULTS
-'Updated table.'
----- TYPES
-STRING
-====
----- QUERY
 # Table-level stats are dropped for non-HMS integrated Iceberg tables.
 describe formatted ice_alltypes_ht;
 ---- RESULTS: VERIFY_IS_NOT_IN
