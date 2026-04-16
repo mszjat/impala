@@ -220,6 +220,7 @@ elif [[ $DISTRIBUTION == Chainguard ]]; then
     posix-libc-utils \
     localedef \
     cyrus-sasl \
+    cyrus-sasl-plain \
     krb5-libs \
     krb5 \
     openssl \
