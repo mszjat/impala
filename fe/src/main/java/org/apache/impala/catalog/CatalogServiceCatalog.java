@@ -1816,10 +1816,10 @@ public class CatalogServiceCatalog extends Catalog {
   private void lockTableAndAddToCatalogDelta(final long tblVersion, Table tbl,
       GetCatalogDeltaContext ctx, boolean lockWithTimeout) throws TException {
     Stopwatch sw = Stopwatch.createStarted();
-    if (tbl instanceof HdfsTable && lockWithTimeout) {
-      if (!lockHdfsTblWithTimeout(tblVersion, (HdfsTable) tbl, ctx)) return;
+    if ((tbl instanceof HdfsTable || tbl instanceof IcebergTable) && lockWithTimeout) {
+      if (!lockTableWithTimeout(tblVersion, tbl, ctx)) return;
     } else {
-      // this is not HdfsTable or lockWithTimeout is false.
+      // this is not HdfsTable/IcebergTable or lockWithTimeout is false.
       // We block until table read lock is acquired.
       tbl.takeReadLock();
     }
@@ -1836,16 +1836,25 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
-   * Attempts to take a read lock on the give HdfsTable within a configurable timeout
-   * of {@code topicUpdateTblLockMaxWaitTimeMs}.
+   * Attempts to take a read lock on an HdfsTable or IcebergTable within a configurable
+   * timeout of {@code topicUpdateTblLockMaxWaitTimeMs}.
+   * For IcebergTable, the table itself is locked but the internal HdfsTable is used for
+   * pending version tracking and skip counting.
    * @param tblVersion The version of the table when topic update thread inspects the
    *                   table to be added to the catalog topic updates.
-   * @param hdfsTable The table to be read locked.
+   * @param tbl The table to be read locked (HdfsTable or IcebergTable).
    * @param ctx The current {@link GetCatalogDeltaContext} for this topic update.
    * @return true if the table was successfully read-locked, false otherwise.
    */
-  private boolean lockHdfsTblWithTimeout(long tblVersion, HdfsTable hdfsTable,
+  private boolean lockTableWithTimeout(long tblVersion, Table tbl,
       GetCatalogDeltaContext ctx) {
+    // Get the HdfsTable for pending version tracking and skip counting.
+    // For HdfsTable, this is the table itself.
+    // For IcebergTable, get the internal HdfsTable.
+    HdfsTable hdfsTable = (tbl instanceof IcebergTable)
+      ? ((IcebergTable) tbl).getHdfsTable()
+        : (HdfsTable) tbl;
+
     // see the comment below on why we need 2 attempts.
     final int maxAttempts = 2;
     int attemptCount = 0;
@@ -1856,8 +1865,8 @@ public class CatalogServiceCatalog extends Catalog {
       // to wait to acquire the table lock. We make 2 attempts and hence the timeout here
       // is topicUpdateTblLockMaxWaitTimeMs/2 so that overall the method waits for
       // maximum of topicUpdateTblLockMaxWaitTimeMs for the lock.
-      long timeoutMs = topicUpdateTblLockMaxWaitTimeMs_ /maxAttempts;
-      lockAcquired = tryLock(hdfsTable, false, timeoutMs);
+      long timeoutMs = topicUpdateTblLockMaxWaitTimeMs_ / maxAttempts;
+      lockAcquired = tryLock(tbl, false, timeoutMs);
       if (lockAcquired) {
         // table lock was successfully acquired. We can now release the versionLock.
         versionLock_.writeLock().unlock();
@@ -1886,16 +1895,16 @@ public class CatalogServiceCatalog extends Catalog {
     // lock could not be acquired, we update the skip count in the topicUpdate entry
     // if applicable.
     TopicUpdateLog.Entry topicUpdateEntry = topicUpdateLog_
-        .getOrCreateLogEntry(hdfsTable.getUniqueName());
+        .getOrCreateLogEntry(tbl.getUniqueName());
     LOG.info(
         "Table {} (version={}, lastSeen={}) is skipping topic update ({}, {}] "
-            + "due to lock contention", hdfsTable.getFullName(), tblVersion,
+            + "due to lock contention", tbl.getFullName(), tblVersion,
         hdfsTable.getLastVersionSeenByTopicUpdate(), ctx.fromVersion, ctx.toVersion);
     if (hdfsTable.getLastVersionSeenByTopicUpdate() != tblVersion) {
       // if the last version skipped by topic update is not same as the last version
       // sent, it means the table was updated and topic update thread is lagging
       // behind.
-      topicUpdateLog_.add(hdfsTable.getUniqueName(),
+      topicUpdateLog_.add(tbl.getUniqueName(),
           new TopicUpdateLog.Entry(
               topicUpdateEntry.getNumSkippedTopicUpdates(),
               topicUpdateEntry.getLastSentVersion(),

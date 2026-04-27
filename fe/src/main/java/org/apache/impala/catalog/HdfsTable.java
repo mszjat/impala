@@ -314,7 +314,7 @@ public class HdfsTable extends Table implements FeFsTable {
   // thread-safe set to avoid breaking other readers like toMinimalTCatalogObject().
   private final Set<HdfsPartition> droppedPartitions_ = ConcurrentHashMap.newKeySet();
 
-  // pendingVersionNumber indicates a version number allocated to this HdfsTable for a
+  // pendingVersionNumber indicates a version number allocated to this HdfsTable for an
   // ongoing DDL operation. This is mainly used by the topic update thread to skip a
   // table from the topic updates if it cannot acquire lock on this table. The topic
   // update thread bumps up this to a higher value outside the topic window so that
