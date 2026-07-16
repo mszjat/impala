@@ -17,6 +17,7 @@
 
 from tests.common.file_utils import create_table_from_parquet
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import SkipIfFS
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
 
@@ -47,3 +48,22 @@ class TestDatasketches(ImpalaTestSuite):
     create_table_from_parquet(self.client, unique_database, 'kll_sketches_from_hive')
     create_table_from_parquet(self.client, unique_database, 'kll_sketches_from_impala')
     self.run_test_case('QueryTest/datasketches-kll', vector, unique_database)
+
+
+class TestDatasketchesOrcHiveInterop(ImpalaTestSuite):
+  """IMPALA-9821: Tests that ds_hll_sketch() returns BINARY and that consuming
+  functions accept BINARY, enabling interop with Hive-written ORC sketch tables."""
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestDatasketchesOrcHiveInterop, cls).add_test_dimensions()
+    cls.ImpalaTestMatrix.add_dimension(create_single_exec_option_dimension())
+    cls.ImpalaTestMatrix.add_constraint(lambda v:
+        v.get_value('table_format').file_format == 'orc')
+
+  @SkipIfFS.hive
+  def test_hll_sketch_orc_string_binary_mismatch(self, vector, unique_database):
+    """IMPALA-9821: Hive writes sketch as BINARY to ORC/HMS; after the fix Impala must
+    accept BINARY sketch columns and pass them to ds_hll_estimate()."""
+    self.run_test_case(
+        'QueryTest/datasketches-hll-hive-orc', vector, unique_database)

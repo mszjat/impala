@@ -1125,7 +1125,7 @@ public class BuiltinsDb extends Db {
             true, false, true));
 
         db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_hll_sketch",
-            Lists.newArrayList(t), Type.STRING, Type.STRING,
+            Lists.newArrayList(t), Type.BINARY, Type.STRING,
             prefix + "9DsHllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + DS_HLL_UPDATE_SYMBOL.get(t),
             prefix + "10DsHllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -1137,7 +1137,7 @@ public class BuiltinsDb extends Db {
             "ds_hll_sketch_and_estimate", Lists.newArrayList(t), Type.STRING,
             Type.STRING));
         db.addBuiltin(AggregateFunction.createUnsupportedBuiltin(db, "ds_hll_sketch",
-            Lists.newArrayList(t), Type.STRING, Type.STRING));
+            Lists.newArrayList(t), Type.BINARY, Type.STRING));
       }
 
       // DataSketches CPC
@@ -1152,7 +1152,7 @@ public class BuiltinsDb extends Db {
             true, false, true));
 
         db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_cpc_sketch",
-            Lists.newArrayList(t), Type.STRING, Type.STRING,
+            Lists.newArrayList(t), Type.BINARY, Type.STRING,
             prefix + "9DsCpcInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + DS_CPC_UPDATE_SYMBOL.get(t),
             prefix + "10DsCpcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -1164,7 +1164,7 @@ public class BuiltinsDb extends Db {
             "ds_cpc_sketch_and_estimate", Lists.newArrayList(t), Type.STRING,
             Type.STRING));
         db.addBuiltin(AggregateFunction.createUnsupportedBuiltin(db, "ds_cpc_sketch",
-                Lists.newArrayList(t), Type.STRING, Type.STRING));
+                Lists.newArrayList(t), Type.BINARY, Type.STRING));
       }
 
       // DataSketches Theta
@@ -1179,7 +1179,7 @@ public class BuiltinsDb extends Db {
                 true, false, true));
 
         db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_theta_sketch",
-                Lists.newArrayList(t), Type.STRING, Type.STRING,
+                Lists.newArrayList(t), Type.BINARY, Type.STRING,
                 prefix + "11DsThetaInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
                 prefix + DS_THETA_UPDATE_SYMBOL.get(t),
                 prefix + "12DsThetaMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -1191,7 +1191,7 @@ public class BuiltinsDb extends Db {
                 "ds_theta_sketch_and_estimate", Lists.newArrayList(t), Type.STRING,
                 Type.STRING));
         db.addBuiltin(AggregateFunction.createUnsupportedBuiltin(db, "ds_theta_sketch",
-                Lists.newArrayList(t), Type.STRING, Type.STRING));
+                Lists.newArrayList(t), Type.BINARY, Type.STRING));
       }
 
       // SAMPLED_NDV.
@@ -1606,7 +1606,7 @@ public class BuiltinsDb extends Db {
 
     // DataSketches HLL sketch
     db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_kll_sketch",
-        Lists.<Type>newArrayList(Type.FLOAT), Type.STRING, Type.STRING,
+        Lists.<Type>newArrayList(Type.FLOAT), Type.BINARY, Type.STRING,
         prefix + "9DsKllInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         prefix + "11DsKllUpdateEPN10impala_udf15FunctionContextERKNS1_8FloatValEPNS1_" +
             "9StringValE",
@@ -1618,6 +1618,18 @@ public class BuiltinsDb extends Db {
     // DataSketches KLL union
     db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_kll_union",
         Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING,
+        prefix + "14DsKllUnionInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix +
+            "16DsKllUnionUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "15DsKllUnionMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "19DsKllUnionSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix +
+            "18DsKllUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_kll_union",
+        Lists.<Type>newArrayList(Type.BINARY), Type.STRING, Type.STRING,
         prefix + "14DsKllUnionInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         prefix +
             "16DsKllUnionUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -1650,10 +1662,34 @@ public class BuiltinsDb extends Db {
         prefix +
             "18DsHllUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         true, false, true));
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_hll_union",
+        Lists.<Type>newArrayList(Type.BINARY), Type.STRING, Type.STRING,
+        prefix + "14DsHllUnionInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix +
+            "16DsHllUnionUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "15DsHllUnionMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "19DsHllUnionSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix +
+            "18DsHllUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
 
     // DataSketches CPC union
     db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_cpc_union",
         Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING,
+        prefix + "14DsCpcUnionInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix +
+            "16DsCpcUnionUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "15DsCpcUnionMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "19DsCpcUnionSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix +
+            "18DsCpcUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_cpc_union",
+        Lists.<Type>newArrayList(Type.BINARY), Type.STRING, Type.STRING,
         prefix + "14DsCpcUnionInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         prefix +
             "16DsCpcUnionUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -1678,10 +1714,34 @@ public class BuiltinsDb extends Db {
         prefix +
             "20DsThetaUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         true, false, true));
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_theta_union",
+        Lists.<Type>newArrayList(Type.BINARY), Type.STRING, Type.STRING,
+        prefix + "16DsThetaUnionInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix +
+            "18DsThetaUnionUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "17DsThetaUnionMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "21DsThetaUnionSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix +
+            "20DsThetaUnionFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
 
     // DataSketches Theta intersect
     db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_theta_intersect",
         Lists.<Type>newArrayList(Type.STRING), Type.STRING, Type.STRING,
+        prefix + "20DsThetaIntersectInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix +
+            "22DsThetaIntersectUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "21DsThetaIntersectMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+        prefix +
+            "25DsThetaIntersectSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        prefix +
+            "24DsThetaIntersectFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+        true, false, true));
+    db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_theta_intersect",
+        Lists.<Type>newArrayList(Type.BINARY), Type.STRING, Type.STRING,
         prefix + "20DsThetaIntersectInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
         prefix +
             "22DsThetaIntersectUpdateEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",

@@ -106,11 +106,9 @@ NULL,NULL,NULL,NULL
 BIGINT,BIGINT,BIGINT,BIGINT
 ====
 ---- QUERY
-# Write sketches to a table as string and get an estimate from the written sketch.
-# Note, the plan is to write sketches as binary instead of strings. For this we have to
-# wait for the binary support (IMPALA-9482).
+# Write sketches to a table as binary and get an estimate from the written sketch.
 create table sketch_store
-    (year int, month int, date_sketch string, float_sketch string)
+    (year int, month int, date_sketch binary, float_sketch binary)
 stored as parquet;
 insert into sketch_store
     select

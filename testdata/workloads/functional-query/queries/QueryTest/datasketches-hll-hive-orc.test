@@ -1,0 +1,37 @@
+====
+---- HIVE_QUERY
+# IMPALA-9821: Hive's ds_hll_sketch() returns BINARY and writes BINARY to ORC and HMS.
+# After the fix, Impala's ds_hll_estimate() must accept BINARY input.
+create table $DATABASE.hive_hll_orc stored as orc as
+select int_col, ds_hll_sketch(string_col) as sketch
+from functional.alltypestiny
+group by int_col
+====
+---- QUERY
+invalidate metadata $DATABASE.hive_hll_orc
+====
+---- QUERY
+# Step 1: Simply reading the sketch column must work after the ORC fix (IMPALA-9482).
+# Without that fix, any query that reads the sketch column fails with:
+#   "Type mismatch: table column STRING is map to column binary in ORC file"
+# (The WHERE clause forces Impala to open and validate the sketch column in ORC.)
+select count(*) from $DATABASE.hive_hll_orc where sketch is not null
+---- RESULTS
+2
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Step 2: Sketch estimation on the BINARY column must work.
+# Without the function fix (IMPALA-9821) this fails at analysis with:
+#   "No matching function with signature: ds_hll_estimate(BINARY)"
+# Each group has at least one distinct string_col value, so ndv >= 1.
+select int_col, ds_hll_estimate(sketch) >= 1
+from $DATABASE.hive_hll_orc
+order by int_col
+---- RESULTS
+0,true
+1,true
+---- TYPES
+INT,BOOLEAN
+====

@@ -106,11 +106,9 @@ from functional_parquet.emptytable;
 BIGINT,BIGINT,BIGINT,BIGINT
 ====
 ---- QUERY
-# Write sketches to a table as string and get an estimate from the written sketch.
-# Note, the plan is to write sketches as binary instead of strings. For this we have to
-# wait for the binary support (IMPALA-9482).
+# Write sketches to a table as binary and get an estimate from the written sketch.
 create table sketch_store
-    (year int, month int, date_sketch string, float_sketch string)
+    (year int, month int, date_sketch binary, float_sketch binary)
 stored as parquet;
 insert into sketch_store
     select
@@ -142,7 +140,7 @@ UDF ERROR: Unable to deserialize sketch: sketch type mismatch: expected 3, actua
 ====
 ---- QUERY
 # Check that ds_theta_estimate returns error for HLL serialized sketches.
-create table hll_sketch_store (date_sketch string) stored as parquet;
+create table hll_sketch_store (date_sketch binary) stored as parquet;
 insert into hll_sketch_store
     select ds_hll_sketch(date_string_col)
     from functional_parquet.alltypessmall;
@@ -392,7 +390,7 @@ BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 create table sketch_input (id1 int, id2 int);
 insert into table sketch_input values
   (1, 2), (2, 4), (3, 6), (4, 8), (5, 10), (6, 12), (7, 14), (8, 16), (9, 18), (10, 20);
-create table sketch_intermediate (sketch1 string, sketch2 string) stored as parquet;
+create table sketch_intermediate (sketch1 binary, sketch2 binary) stored as parquet;
 insert overwrite sketch_intermediate
   select ds_theta_sketch(id1), ds_theta_sketch(id2) from sketch_input;
 select ds_theta_estimate(ds_theta_exclude(sketch1, sketch2)) from sketch_intermediate;

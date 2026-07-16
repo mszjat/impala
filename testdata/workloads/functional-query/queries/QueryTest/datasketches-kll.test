@@ -92,7 +92,7 @@ select ds_kll_sketch(d) from functional_parquet.nulltable;
 ---- RESULTS
 'NULL'
 ---- TYPES
-STRING
+BINARY
 ====
 ---- QUERY
 # Check that ds_kll_sketch() returns null for empty input.
@@ -100,14 +100,14 @@ select ds_kll_sketch(f2) from functional_parquet.emptytable;
 ---- RESULTS
 'NULL'
 ---- TYPES
-STRING
+BINARY
 ====
 ---- QUERY
 # Write sketches to a table as string and get an estimate from the written sketch.
 # Note, the plan is to write sketches as binary instead of strings. For this we have to
-# wait for the binary support (IMPALA-9482).
+# Write sketches to a table as binary and get an estimate from the written sketch.
 create table sketch_store
-    (year int, month int, id_sketch string, float_sketch string)
+    (year int, month int, id_sketch binary, float_sketch binary)
 stored as parquet;
 insert into sketch_store
     select
@@ -405,7 +405,7 @@ select
     ds_kll_quantiles_as_string(ds_kll_sketch(float_col))
 from functional_parquet.alltypessmall;
 ---- CATCH
-AnalysisException: No matching function with signature: ds_kll_quantiles_as_string(STRING)
+AnalysisException: No matching function with signature: ds_kll_quantiles_as_string(BINARY)
 ====
 ---- QUERY
 # Checks that ds_kll_pmf_as_string() produces NULL for an empty dataset.
