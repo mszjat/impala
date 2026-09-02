@@ -17,21 +17,9 @@
 
 package org.apache.impala.authentication.saml;
 
-// copy of https://github.com/vihangk1/hive/blob/master_saml/service/src/java/org/apache/hive/service/auth/saml/HiveSamlRelayStateInfo.java
-public class HiveSamlRelayStateInfo {
-  private final int port;
-  private final String clientIdentifier;
-
-  HiveSamlRelayStateInfo(int port, String clientIdentifier) {
-    this.port = port;
-    this.clientIdentifier = clientIdentifier;
-  }
-
-  public int getPort() {
-    return port;
-  }
-
-  public String getClientIdentifier() {
-    return clientIdentifier;
-  }
+/**
+ * Common interface for relay state information used in SAML authentication.
+ * Allows different implementations for HS2 (port-based) and WebServer (URI-based).
+ */
+public interface HiveSamlRelayStateInfo {
 }
