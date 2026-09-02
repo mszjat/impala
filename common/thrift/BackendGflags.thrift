@@ -376,4 +376,8 @@ struct TBackendGflags {
   173: required i32 unregistration_thread_pool_size
 
   174: required string cte_suggester_class
+
+  175: required string webserver_saml2_idp_metadata
+
+  176: required string webserver_saml2_sp_callback_url
 }
