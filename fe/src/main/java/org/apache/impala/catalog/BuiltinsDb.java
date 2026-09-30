@@ -432,8 +432,12 @@ public class BuiltinsDb extends Db {
 
   private static final Map<Type, String> DS_THETA_UPDATE_SYMBOL =
       ImmutableMap.<Type, String>builder()
+        .put(Type.BOOLEAN,
+            "13DsThetaUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.TINYINT,
             "13DsThetaUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.SMALLINT,
+            "13DsThetaUpdateIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.INT,
             "13DsThetaUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.BIGINT,
@@ -444,6 +448,12 @@ public class BuiltinsDb extends Db {
             "13DsThetaUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.STRING,
             "13DsThetaUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+        .put(Type.TIMESTAMP,
+            "13DsThetaUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.DATE,
+            "13DsThetaUpdateIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.DECIMAL,
+            "13DsThetaUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .build();
 
   private static final Map<Type, String> SAMPLED_NDV_UPDATE_SYMBOL =

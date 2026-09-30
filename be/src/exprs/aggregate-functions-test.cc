@@ -23,6 +23,8 @@
 #include <boost/accumulators/statistics/variance.hpp>
 
 #include "exprs/aggregate-functions.h"
+#include "runtime/timestamp-value.h"
+#include "runtime/timestamp-value.inline.h"
 #include "testutil/gtest-util.h"
 #include "udf/udf.h"
 #include "udf/uda-test-harness.h"
@@ -179,6 +181,62 @@ TEST(DsThetaSketch, DataToSketch) {
 
   EXPECT_TRUE(test.Execute(input, BigIntVal(6)))
       << "DsThetaSketch: " << test.GetErrorMsg();
+}
+
+// Helper: build a TimestampVal from unix microseconds.
+static TimestampVal MakeTimestampVal(int64_t unix_micros) {
+  TimestampVal tv;
+  TimestampValue::UtcFromUnixTimeMicros(unix_micros).ToTimestampVal(&tv);
+  return tv;
+}
+
+// DsThetaUpdate<TimestampVal> specialisation converts to microseconds before hashing,
+// so two TimestampVals representing the same instant must produce NDV=1 and two
+// representing different instants must produce NDV=2.
+TEST(DsThetaSketch, DataToSketchTimestamp) {
+  UdaTestHarness<BigIntVal, StringVal, TimestampVal> test(
+      AggregateFunctions::DsThetaInit,
+      AggregateFunctions::DsThetaUpdate<TimestampVal>,
+      AggregateFunctions::DsThetaMerge,
+      AggregateFunctions::DsThetaSerialize,
+      AggregateFunctions::DsThetaFinalize);
+
+  // Empty input → 0.
+  std::vector<TimestampVal> input;
+  EXPECT_TRUE(test.Execute(input, BigIntVal(0)))
+      << "DsThetaSketch<Timestamp> empty: " << test.GetErrorMsg();
+
+  // Three distinct timestamps (0 s, 1 s, 2 s since epoch).
+  input.push_back(MakeTimestampVal(0));
+  input.push_back(MakeTimestampVal(1000000));
+  input.push_back(MakeTimestampVal(2000000));
+  EXPECT_TRUE(test.Execute(input, BigIntVal(3)))
+      << "DsThetaSketch<Timestamp> distinct: " << test.GetErrorMsg();
+
+  // Repeated timestamp → 1.
+  input.clear();
+  input.push_back(MakeTimestampVal(42000000));
+  input.push_back(MakeTimestampVal(42000000));
+  input.push_back(MakeTimestampVal(42000000));
+  EXPECT_TRUE(test.Execute(input, BigIntVal(1)))
+      << "DsThetaSketch<Timestamp> duplicate: " << test.GetErrorMsg();
+
+  // Pre-epoch (negative micros) values exercise the signed encoding path; three
+  // distinct instants straddling the epoch → 3, and a repeat of a negative → still 3.
+  input.clear();
+  input.push_back(MakeTimestampVal(-2000000));
+  input.push_back(MakeTimestampVal(-1000000));
+  input.push_back(MakeTimestampVal(-2000000));
+  input.push_back(MakeTimestampVal(1000000));
+  EXPECT_TRUE(test.Execute(input, BigIntVal(3)))
+      << "DsThetaSketch<Timestamp> negative: " << test.GetErrorMsg();
+
+  // NULLs are skipped → 0.
+  input.clear();
+  input.push_back(TimestampVal::null());
+  input.push_back(TimestampVal::null());
+  EXPECT_TRUE(test.Execute(input, BigIntVal(0)))
+      << "DsThetaSketch<Timestamp> nulls: " << test.GetErrorMsg();
 }
 
 IMPALA_TEST_MAIN();

@@ -2771,6 +2771,63 @@ void AggregateFunctions::DsThetaUpdate(
   sketch_ptr->update(reinterpret_cast<char*>(src.ptr), src.len);
 }
 
+// Specialize for TimestampVal: encode as microseconds since epoch per Iceberg
+// single-value serialization (Appendix D: timestamp → 8-byte little-endian int64).
+template <>
+void AggregateFunctions::DsThetaUpdate(
+    FunctionContext* ctx, const TimestampVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(agg_state));
+  auto agg_state_ptr = reinterpret_cast<agg_state*>(dst->ptr);
+  DCHECK_EQ(agg_state_ptr->first, agg_phase::UPDATE);
+  auto sketch_ptr =
+      reinterpret_cast<datasketches::update_theta_sketch*>(agg_state_ptr->second);
+  int64_t micros;
+  if (UNLIKELY(
+      !TimestampValue::FromTimestampVal(src).FloorUtcToUnixTimeMicros(&micros))) {
+    return;
+  }
+  sketch_ptr->update(micros);
+}
+
+// Specialize for DecimalVal: encode as big-endian two's-complement minimum bytes per
+// Iceberg single-value serialization (Appendix D: decimal(P,S) → unscaled value,
+// big-endian, minimum bytes).
+template <>
+void AggregateFunctions::DsThetaUpdate(
+    FunctionContext* ctx, const DecimalVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(agg_state));
+  auto agg_state_ptr = reinterpret_cast<agg_state*>(dst->ptr);
+  DCHECK_EQ(agg_state_ptr->first, agg_phase::UPDATE);
+  auto sketch_ptr =
+      reinterpret_cast<datasketches::update_theta_sketch*>(agg_state_ptr->second);
+  const FunctionContext::TypeDesc* arg_type = ctx->GetArgType(0);
+  DCHECK(arg_type != nullptr);
+  // Convert unscaled integer to big-endian and strip redundant sign-extension bytes
+  // (same logic as ColumnStats<DecimalNValue>::SerializeIcebergSingleValue).
+  auto update_sketch = [&](auto unscaled) {
+    auto be = BitUtil::ToBigEndian(unscaled);
+    const uint8_t* first = reinterpret_cast<const uint8_t*>(&be);
+    const uint8_t* last = first + sizeof(be) - 1;
+    if ((first[0] & 0x80) != 0) {
+      for (; first < last && first[0] == 0xFF && (first[1] & 0x80) != 0; ++first) {}
+    } else {
+      for (; first < last && first[0] == 0x00 && (first[1] & 0x80) == 0; ++first) {}
+    }
+    sketch_ptr->update(first, last - first + 1);
+  };
+  if (arg_type->precision <= ColumnType::MAX_DECIMAL4_PRECISION) {
+    update_sketch(src.val4);
+  } else if (arg_type->precision <= ColumnType::MAX_DECIMAL8_PRECISION) {
+    update_sketch(src.val8);
+  } else {
+    update_sketch(src.val16);
+  }
+}
+
 StringVal AggregateFunctions::DsThetaSerialize(
     FunctionContext* ctx, const StringVal& src) {
   DCHECK(!src.is_null);
@@ -4122,6 +4179,8 @@ template void AggregateFunctions::DsThetaUpdate(
     FunctionContext*, const DoubleVal&, StringVal*);
 template void AggregateFunctions::DsThetaUpdate(
     FunctionContext*, const DateVal&, StringVal*);
+// TimestampVal and DecimalVal use explicit specialisations above; no template keyword.
+
 
 template void AggregateFunctions::SampledNdvUpdate(
     FunctionContext*, const BooleanVal&, const DoubleVal&, StringVal*);

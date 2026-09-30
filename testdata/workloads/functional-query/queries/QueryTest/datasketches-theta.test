@@ -2,78 +2,70 @@
 ---- QUERY
 # Use a small table for testing Datasketches Theta functions through Impala to make sure
 # that these approximate functions give the correct result. For testing Impala
-# functionality no need to test how Datasketches Theta approximates count distint values
+# functionality no need to test how Datasketches Theta approximates count distinct values
 # so a small table is enough.
 select
+    ds_theta_estimate(ds_theta_sketch(bool_col)),
     ds_theta_estimate(ds_theta_sketch(tinyint_col)),
+    ds_theta_estimate(ds_theta_sketch(smallint_col)),
     ds_theta_estimate(ds_theta_sketch(int_col)),
     ds_theta_estimate(ds_theta_sketch(bigint_col)),
     ds_theta_estimate(ds_theta_sketch(float_col)),
     ds_theta_estimate(ds_theta_sketch(double_col)),
-    ds_theta_estimate(ds_theta_sketch(string_col))
+    ds_theta_estimate(ds_theta_sketch(string_col)),
+    ds_theta_estimate(ds_theta_sketch(timestamp_col))
 from functional_parquet.alltypessmall;
 ---- RESULTS
-10,10,10,10,10,10
+2,10,10,10,10,10,10,10,100
 ---- TYPES
-BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ====
 ---- QUERY
 select
+    ds_theta_sketch_and_estimate(bool_col),
     ds_theta_sketch_and_estimate(tinyint_col),
+    ds_theta_sketch_and_estimate(smallint_col),
     ds_theta_sketch_and_estimate(int_col),
     ds_theta_sketch_and_estimate(bigint_col),
     ds_theta_sketch_and_estimate(float_col),
     ds_theta_sketch_and_estimate(double_col),
-    ds_theta_sketch_and_estimate(string_col)
+    ds_theta_sketch_and_estimate(string_col),
+    ds_theta_sketch_and_estimate(timestamp_col)
 from functional_parquet.alltypessmall;
 ---- RESULTS
-10,10,10,10,10,10
+2,10,10,10,10,10,10,10,100
 ---- TYPES
-BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
 ====
 ---- QUERY
-# Check that unsupported types give error with ds_theta_sketch().
-select ds_theta_sketch(bool_col) from functional_parquet.alltypessmall;
----- CATCH
-AnalysisException: No matching function with signature: ds_theta_sketch(BOOLEAN)
+# DATE support: count distinct date values.
+select ds_theta_estimate(ds_theta_sketch(date_col)) from functional_parquet.date_tbl;
+---- RESULTS
+17
+---- TYPES
+BIGINT
 ====
 ---- QUERY
-select ds_theta_sketch(smallint_col) from functional_parquet.alltypessmall;
----- CATCH
-AnalysisException: No matching function with signature: ds_theta_sketch(SMALLINT)
+select ds_theta_sketch_and_estimate(date_col) from functional_parquet.date_tbl;
+---- RESULTS
+17
+---- TYPES
+BIGINT
 ====
 ---- QUERY
-select ds_theta_sketch(cast(date_string_col as date format 'MM/DD/YYYY'))
-from functional_parquet.alltypessmall;
----- CATCH
-AnalysisException: No matching function with signature: ds_theta_sketch(DATE)
-====
----- QUERY
-select ds_theta_sketch(d1) from functional_parquet.decimal_tbl;
----- CATCH
-AnalysisException: No matching function with signature: ds_theta_sketch(DECIMAL(9,0))
-====
----- QUERY
-# Check that unsupported types give error with ds_theta_sketch_and_estimate().
-select ds_theta_sketch_and_estimate(bool_col) from functional_parquet.alltypessmall;
----- CATCH
-AnalysisException: No matching function with signature: ds_theta_sketch_and_estimate(BOOLEAN)
-====
----- QUERY
-select ds_theta_sketch_and_estimate(smallint_col) from functional_parquet.alltypessmall;
----- CATCH
-AnalysisException: No matching function with signature: ds_theta_sketch_and_estimate(SMALLINT)
-====
----- QUERY
-select ds_theta_sketch_and_estimate(cast(date_string_col as date format 'MM/DD/YYYY'))
-from functional_parquet.alltypessmall;
----- CATCH
-AnalysisException: No matching function with signature: ds_theta_sketch_and_estimate(DATE)
+# DECIMAL support: count distinct decimal values.
+select ds_theta_estimate(ds_theta_sketch(d1)) from functional_parquet.decimal_tbl;
+---- RESULTS
+4
+---- TYPES
+BIGINT
 ====
 ---- QUERY
 select ds_theta_sketch_and_estimate(d1) from functional_parquet.decimal_tbl;
----- CATCH
-AnalysisException: No matching function with signature: ds_theta_sketch_and_estimate(DECIMAL(9,0))
+---- RESULTS
+4
+---- TYPES
+BIGINT
 ====
 ---- QUERY
 # Check if Theta works with null values.
