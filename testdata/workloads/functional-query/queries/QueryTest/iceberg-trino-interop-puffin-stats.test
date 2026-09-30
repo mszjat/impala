@@ -1,0 +1,59 @@
+# Impala <-> Trino interop over Apache Iceberg V3 tables: Puffin NDV statistics.
+#
+# Both engines write column NDV statistics as 'apache-datasketches-theta-v1' Puffin
+# blobs (Impala via COMPUTE STATS, Trino via ANALYZE) and read them back through the
+# Iceberg statistics-file API. This file proves the two are wire-compatible:
+#   - Direction A: Impala COMPUTE STATS writes the Puffin file; Trino SHOW STATS reads
+#     the distinct-values count from it.
+#   - Direction B: Trino ANALYZE writes the Puffin file; Impala SHOW COLUMN STATS reads
+#     the #Distinct Values from it.
+#
+# Trino runs in the 'impala-minicluster-trino' container and shares Impala's HMS and
+# HDFS (see testdata/bin/TRINO-README.md). Impala must INVALIDATE METADATA after Trino
+# writes; Trino reads Impala's writes without an explicit refresh. SHOW STATS rows are
+# matched with row_regex so only the deterministic distinct-values / nulls-fraction
+# columns are asserted (data_size and low/high bounds are left unconstrained).
+====
+---- QUERY
+# Direction A: Impala creates a V3 table and inserts 5 distinct values per column.
+CREATE TABLE it_puffin (i INT, s STRING) STORED BY ICEBERG
+TBLPROPERTIES('format-version'='3');
+INSERT INTO it_puffin VALUES (1, 'a'), (2, 'b'), (3, 'c'), (4, 'd'), (5, 'e');
+====
+---- QUERY
+# Impala COMPUTE STATS writes the theta-sketch NDV blobs into a Puffin statistics file.
+COMPUTE STATS it_puffin;
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+---- TYPES
+STRING
+====
+---- TRINO_QUERY
+# Trino reads Impala's Puffin NDV stats: distinct_values_count = 5 for both columns.
+SHOW STATS FOR it_puffin
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'i',[^,]*,5\.0,0\.0,.*
+row_regex:'s',[^,]*,5\.0,0\.0,.*
+---- TYPES
+STRING,DOUBLE,DOUBLE,DOUBLE,DOUBLE,STRING,STRING
+====
+---- TRINO_QUERY
+# Direction B: Trino creates a V3 table, inserts 5 distinct values, and ANALYZE writes
+# the theta-sketch NDV blobs into a Puffin statistics file.
+CREATE TABLE tt_puffin (i integer, s varchar) WITH (format_version=3);
+INSERT INTO tt_puffin VALUES (10, 'p'), (20, 'q'), (30, 'r'), (40, 's'), (50, 't');
+ANALYZE tt_puffin
+====
+---- QUERY
+# Impala reads Trino's Puffin NDV stats after INVALIDATE: #Distinct Values = 5. Only NDV
+# is carried by Puffin, so #Nulls stays -1 (unknown) and size columns are unconstrained.
+INVALIDATE METADATA tt_puffin;
+SHOW COLUMN STATS tt_puffin;
+---- RESULTS: VERIFY_IS_SUBSET
+row_regex:'i','INT',5,.*
+row_regex:'s','STRING',5,.*
+---- LABELS
+Column,Type,#Distinct Values,#Nulls,Max Size,Avg Size,#Trues,#Falses
+---- TYPES
+STRING,STRING,BIGINT,BIGINT,BIGINT,DOUBLE,BIGINT,BIGINT
+====

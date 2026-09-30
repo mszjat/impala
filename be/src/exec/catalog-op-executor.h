@@ -63,7 +63,9 @@ class CatalogOpExecutor {
       const apache::hive::service::cli::thrift::TRowSet& tbl_stats_data,
       const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,
       const apache::hive::service::cli::thrift::TRowSet& col_stats_data,
-      const std::optional<long>& snapshot_id);
+      const std::optional<long>& snapshot_id,
+      const apache::hive::service::cli::thrift::TTableSchema& theta_sketch_schema,
+      const apache::hive::service::cli::thrift::TRowSet& theta_sketch_data);
 
   /// Makes an RPC to the CatalogServer to prioritize the loading of the catalog objects
   /// specified in the TPrioritizeLoadRequest. Returns OK if the RPC was successful,
@@ -126,6 +128,10 @@ class CatalogOpExecutor {
   static void SetColumnStats(
       const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,
       const apache::hive::service::cli::thrift::TRowSet& col_stats_data,
+      TAlterTableUpdateStatsParams* params);
+  static void SetThetaSketchBlobs(
+      const apache::hive::service::cli::thrift::TTableSchema& theta_sketch_schema,
+      const apache::hive::service::cli::thrift::TRowSet& theta_sketch_data,
       TAlterTableUpdateStatsParams* params);
 
   /// Response from executing the DDL request, see ddl_exec_response().

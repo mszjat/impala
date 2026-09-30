@@ -161,6 +161,10 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
   // Set during analysis.
   protected String columnStatsQueryStr_;
 
+  // Query for gathering compact theta sketch bytes from ds_theta_sketch().
+  // Only set for Iceberg tables. Returns one STRING column per analyzed column.
+  protected String thetaSketchQueryStr_;
+
   // If true, stats will be gathered incrementally per-partition.
   private boolean isIncremental_;
 
@@ -679,10 +683,50 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
             ", no column statistics will be gathered.");
       }
       columnStatsQueryStr_ = null;
+      thetaSketchQueryStr_ = null;
       return;
     }
     columnStatsQueryStr_ = columnStatsQueryBuilder.toString();
     if (LOG.isTraceEnabled()) LOG.trace("Column stats query: " + columnStatsQueryStr_);
+
+    // Build theta sketch query for Iceberg tables (for Puffin NDV stats).
+    buildThetaSketchQuery(tableSampleSql);
+  }
+
+  /**
+   * Builds a query of the form:
+   *   SELECT ds_theta_sketch_iceberg(c1) AS `c1`, ... FROM tbl [TABLESAMPLE ...]
+   * for all non-binary, non-complex, non-hidden columns of an Iceberg table.
+   * Only called during analyze() for Iceberg tables.
+   */
+  private void buildThetaSketchQuery(String tableSampleSql) {
+    if (!(table_ instanceof FeIcebergTable)) {
+      thetaSketchQueryStr_ = null;
+      return;
+    }
+
+    List<String> selectList = new ArrayList<>();
+    for (Column c : table_.getColumns()) {
+      if (validatedColumnWhitelist_ != null && !validatedColumnWhitelist_.contains(c)) {
+        continue;
+      }
+      if (ignoreColumn(c)) continue;
+      if (c.getType().isBinary()) continue;
+
+      String colRefSql = ToSqlUtils.getIdentSql(c.getName());
+      selectList.add("ds_theta_sketch_iceberg(" + colRefSql + ") AS " + colRefSql);
+    }
+
+    if (selectList.isEmpty()) {
+      thetaSketchQueryStr_ = null;
+      return;
+    }
+
+    thetaSketchQueryStr_ = "SELECT " + Joiner.on(", ").join(selectList)
+        + " FROM " + tableName_.toSql() + tableSampleSql;
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Theta sketch query: " + thetaSketchQueryStr_);
+    }
   }
 
   /**
@@ -977,6 +1021,7 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
    */
   public String getTblStatsQuery() { return tableStatsQueryStr_; }
   public String getColStatsQuery() { return columnStatsQueryStr_; }
+  public String getThetaSketchQuery() { return thetaSketchQueryStr_; }
   public Set<Column> getValidatedColumnWhitelist() { return validatedColumnWhitelist_; }
 
   /**
@@ -1084,6 +1129,9 @@ public class ComputeStatsStmt extends StatementBase implements SingleTableStmt {
 
     if (table_ instanceof FeIcebergTable) {
       params.setIceberg_snapshot_id(((FeIcebergTable) table_).snapshotId());
+    }
+    if (thetaSketchQueryStr_ != null) {
+      params.setTheta_sketch_query(thetaSketchQueryStr_);
     }
     return params;
   }

@@ -178,7 +178,8 @@ Status CatalogOpExecutor::ExecComputeStats(const TCatalogServiceRequestHeader& h
     const TCatalogOpRequest& compute_stats_request,
     const TTableSchema& tbl_stats_schema, const TRowSet& tbl_stats_data,
     const TTableSchema& col_stats_schema, const TRowSet& col_stats_data,
-    const std::optional<long>& snapshot_id) {
+    const std::optional<long>& snapshot_id,
+    const TTableSchema& theta_sketch_schema, const TRowSet& theta_sketch_data) {
   // Create a new DDL request to alter the table's statistics.
   TCatalogOpRequest catalog_op_req;
   catalog_op_req.__isset.ddl_params = true;
@@ -225,6 +226,11 @@ Status CatalogOpExecutor::ExecComputeStats(const TCatalogServiceRequestHeader& h
     } else {
       SetColumnStats(col_stats_schema, col_stats_data, &update_stats_params);
     }
+  }
+
+  // Pack theta sketch blobs for Iceberg Puffin stats (if provided).
+  if (!theta_sketch_schema.columns.empty()) {
+    SetThetaSketchBlobs(theta_sketch_schema, theta_sketch_data, &update_stats_params);
   }
 
   // Execute the 'alter table update stats' request.
@@ -368,6 +374,27 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
     params->column_stats[col_stats_schema.columns[i].columnName] = col_stats;
   }
   params->__isset.column_stats = true;
+}
+
+void CatalogOpExecutor::SetThetaSketchBlobs(const TTableSchema& theta_sketch_schema,
+    const TRowSet& theta_sketch_data, TAlterTableUpdateStatsParams* params) {
+  if (theta_sketch_data.rows.empty()) return;
+  // Expect exactly one result row (aggregate over the whole table).
+  DCHECK_EQ(1, theta_sketch_data.rows.size());
+  DCHECK_EQ(theta_sketch_data.rows.empty() ? 0 : theta_sketch_data.rows[0].colVals.size(),
+      theta_sketch_schema.columns.size());
+
+  for (size_t i = 0; i < theta_sketch_schema.columns.size(); ++i) {
+    const string& col_name = theta_sketch_schema.columns[i].columnName;
+    // ds_theta_sketch() returns STRING; a NULL result means the column had no data.
+    if (!theta_sketch_data.rows[0].colVals[i].__isset.stringVal) continue;
+    const string& sketch_bytes = theta_sketch_data.rows[0].colVals[i].stringVal.value;
+    if (sketch_bytes.empty()) continue;
+    params->theta_sketch_blobs[col_name] = sketch_bytes;
+  }
+  if (!params->theta_sketch_blobs.empty()) {
+    params->__isset.theta_sketch_blobs = true;
+  }
 }
 
 Status CatalogOpExecutor::GetCatalogObject(const TCatalogObject& object_desc,

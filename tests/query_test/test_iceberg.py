@@ -2873,6 +2873,83 @@ class TestIcebergTableWithPuffinStats(IcebergTestSuite):
 
     self._assert_ndv_stats(tbl_info, [-1, -1, -1, -1, -1, -1, -1, -1, 2000, -1])
 
+  def test_compute_stats_writes_puffin(self, unique_database):
+    """Test the full COMPUTE STATS → Puffin write → SHOW COLUMN STATS cycle.
+
+    Verifies that running COMPUTE STATS on an Iceberg table:
+    - Physically creates a .stats Puffin file in the table's metadata directory.
+    - Stores correct NDV values readable via SHOW COLUMN STATS after INVALIDATE METADATA.
+    - Replaces (not accumulates) the Puffin file on a second COMPUTE STATS run.
+    """
+    tbl_name = "{}.ice_cs_puffin".format(unique_database)
+
+    # Use a representative set of types supported by ds_theta_sketch().
+    self.execute_query("""
+        CREATE TABLE {tbl} (
+            i INT, s STRING, ts TIMESTAMP, dt DATE, dc DECIMAL(10, 2))
+        STORED BY ICEBERG""".format(tbl=tbl_name))
+
+    # Insert 5 rows, each with 5 distinct values per column.
+    self.execute_query("""
+        INSERT INTO {tbl} VALUES
+          (1, 'a', '2020-01-01 00:00:00', DATE '2020-01-01', 1.00),
+          (2, 'b', '2020-01-02 00:00:00', DATE '2020-01-02', 2.00),
+          (3, 'c', '2020-01-03 00:00:00', DATE '2020-01-03', 3.00),
+          (4, 'd', '2020-01-04 00:00:00', DATE '2020-01-04', 4.00),
+          (5, 'e', '2020-01-05 00:00:00', DATE '2020-01-05', 5.00)
+    """.format(tbl=tbl_name))
+
+    self.execute_query("COMPUTE STATS {}".format(tbl_name))
+
+    # A .stats Puffin file must exist in the table's metadata directory.
+    # Use WAREHOUSE + db/tbl path directly: _get_table_location() returns the full
+    # hdfs://host:port/path URI which filesystem_client.ls() cannot handle.
+    metadata_dir = os.path.join(
+        WAREHOUSE, unique_database + '.db', 'ice_cs_puffin', 'metadata')
+    metadata_files = self.filesystem_client.ls(metadata_dir)
+    stats_files = [f for f in metadata_files if f.endswith('.stats')]
+    assert len(stats_files) >= 1, \
+        "Expected a .stats file after COMPUTE STATS, got: {}".format(metadata_files)
+
+    # Reload so catalogd picks up the Puffin file written by COMPUTE STATS.
+    self.execute_query("INVALIDATE METADATA {}".format(tbl_name))
+
+    # Theta sketches are exact for small N; all 5 columns should report NDV = 5.
+    res = self.execute_query("SHOW COLUMN STATS {}".format(tbl_name))
+    ndvs = self._get_ndvs_from_query_result(res)
+    assert ndvs == [5, 5, 5, 5, 5], \
+        "Expected NDV=5 for all columns from Puffin, got: {}".format(ndvs)
+
+    # Prove the NDV came from Puffin, not from HMS:
+    # Overwrite HMS NDV to a wrong sentinel value. After INVALIDATE METADATA, the Puffin
+    # blob and the HMS stat reference the same snapshot, so their timestamps tie.
+    # hmsHasMoreRecentStats() returns false on a tie, so the Puffin NDV (5) wins over the
+    # HMS value (999).
+    for col in ('i', 's', 'ts', 'dt', 'dc'):
+      self.execute_query(
+          "ALTER TABLE {tbl} SET COLUMN STATS {col} ('numDVs'='999')".format(
+              tbl=tbl_name, col=col))
+    self.execute_query("INVALIDATE METADATA {}".format(tbl_name))
+
+    res_after_hms_override = self.execute_query(
+        "SHOW COLUMN STATS {}".format(tbl_name))
+    ndvs_after = self._get_ndvs_from_query_result(res_after_hms_override)
+    assert ndvs_after == [5, 5, 5, 5, 5], (
+        "Puffin NDV (5) should override HMS sentinel (999) on timestamp tie, "
+        "got: {}".format(ndvs_after))
+
+    # Add a 6th distinct row and re-run to verify replacement semantics.
+    self.execute_query(
+        "INSERT INTO {tbl} VALUES "
+        "(6, 'f', '2020-01-06 00:00:00', DATE '2020-01-06', 6.00)".format(tbl=tbl_name))
+    self.execute_query("COMPUTE STATS {}".format(tbl_name))
+    self.execute_query("INVALIDATE METADATA {}".format(tbl_name))
+
+    res2 = self.execute_query("SHOW COLUMN STATS {}".format(tbl_name))
+    ndvs2 = self._get_ndvs_from_query_result(res2)
+    assert ndvs2 == [6, 6, 6, 6, 6], \
+        "Expected NDV=6 after re-run with 6 distinct rows, got: {}".format(ndvs2)
+
   def _setup_table(self, vector, unique_database):
     tbl_name = "{}.{}".format(unique_database, self.TBL_NAME)
     create_tbl_stmt = self.CREATE_TBL_STMT_TEMPLATE.format(tbl_name)

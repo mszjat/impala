@@ -400,6 +400,10 @@ struct TAlterTableUpdateStatsParams {
 
   // The snapshotId if this is an Iceberg table
   7: optional i64 snapshot_id
+
+  // Compact theta sketch bytes per column name, for writing Puffin NDV stats.
+  // Only set for Iceberg tables when ds_theta_sketch() results are available.
+  8: optional map<string, binary> theta_sketch_blobs
 }
 
 // Parameters for ALTER TABLE SET [PARTITION partitionSet] CACHED|UNCACHED
@@ -732,6 +736,10 @@ struct TComputeStatsParams {
 
   // If this is an Iceberg table, stores the snapshot id for which stats are computed.
   10: optional i64 iceberg_snapshot_id;
+
+  // Query for gathering per-column theta sketch bytes. Only set for Iceberg tables.
+  // Returns one STRING column per analyzed column, aliased by column name.
+  11: optional string theta_sketch_query;
 }
 
 // Parameters for CREATE/DROP ROLE

@@ -833,6 +833,13 @@ Status ClientRequestState::ExecDdlRequestImplSync() {
       child_queries.emplace_back(compute_stats_params.col_stats_query, this,
           parent_server_, profile, &profile_pool_);
     }
+    if (compute_stats_params.__isset.theta_sketch_query) {
+      RuntimeProfile* profile =
+          RuntimeProfile::Create(&profile_pool_, "Theta Sketch Query");
+      child_profile->AddChild(profile);
+      child_queries.emplace_back(compute_stats_params.theta_sketch_query, this,
+          parent_server_, profile, &profile_pool_);
+    }
 
     if (child_queries.size() > 0) {
       RETURN_IF_ERROR(child_query_executor_->ExecAsync(move(child_queries)));
@@ -2081,20 +2088,30 @@ std::optional<long> getIcebergSnapshotId(const TExecRequest& exec_req) {
 Status ClientRequestState::UpdateTableAndColumnStats(
     const vector<ChildQuery*>& child_queries) {
   DCHECK_GE(child_queries.size(), 1);
-  DCHECK_LE(child_queries.size(), 2);
+  DCHECK_LE(child_queries.size(), 3);
   catalog_op_executor_.reset(
       new CatalogOpExecutor(ExecEnv::GetInstance(), frontend_, server_profile_));
 
-  // If there was no column stats query, pass in empty thrift structures to
-  // ExecComputeStats(). Otherwise pass in the column stats result.
+  const TExecRequest& exec_req = exec_request();
+  const TComputeStatsParams& compute_stats_params =
+      exec_req.catalog_op_request.ddl_params.compute_stats_params;
+
+  // theta_sketch_query, when present, is always the last child query.
+  TTableSchema theta_sketch_schema;
+  TRowSet theta_sketch_data;
+  if (compute_stats_params.__isset.theta_sketch_query) {
+    int theta_idx = child_queries.size() - 1;
+    theta_sketch_schema = child_queries[theta_idx]->result_schema();
+    theta_sketch_data = child_queries[theta_idx]->result_data();
+  }
+
+  // col_stats_query is at index 1 when present (always before theta).
   TTableSchema col_stats_schema;
   TRowSet col_stats_data;
-  if (child_queries.size() > 1) {
+  if (compute_stats_params.__isset.col_stats_query) {
     col_stats_schema = child_queries[1]->result_schema();
     col_stats_data = child_queries[1]->result_data();
   }
-
-  const TExecRequest& exec_req = exec_request();
 
   std::optional<long> snapshot_id = getIcebergSnapshotId(exec_req);
   Status status = catalog_op_executor_->ExecComputeStats(
@@ -2104,7 +2121,9 @@ Status ClientRequestState::UpdateTableAndColumnStats(
       child_queries[0]->result_data(),
       col_stats_schema,
       col_stats_data,
-      snapshot_id);
+      snapshot_id,
+      theta_sketch_schema,
+      theta_sketch_data);
   AddCatalogTimeline();
   {
     lock_guard<mutex> l(lock_);

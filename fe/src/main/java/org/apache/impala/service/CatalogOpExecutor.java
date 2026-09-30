@@ -2102,6 +2102,21 @@ public class CatalogOpExecutor {
       msTbl.getParameters().remove(StatsSetupConst.COLUMN_STATS_ACCURATE);
       applyAlterTable(msTbl, false, tblTxn, catalogTimeline);
     }
+
+    // Write Puffin NDV stats for Iceberg tables when theta sketch blobs are available.
+    if (table instanceof IcebergTable && params.isSetTheta_sketch_blobs()) {
+      Preconditions.checkState(params.isSetSnapshot_id());
+      try {
+        IcebergPuffinStatsWriter.writePuffinNdvStats((IcebergTable) table,
+            params.getTheta_sketch_blobs(), params.getSnapshot_id());
+        catalogTimeline.markEvent("Wrote Puffin NDV stats");
+      } catch (ImpalaRuntimeException e) {
+        // Log the error but do not fail the COMPUTE STATS command — HMS stats were
+        // already written successfully. A subsequent COMPUTE STATS will retry.
+        LOG.warn("Failed to write Puffin NDV stats for table {}: {}",
+            table.getFullName(), e.getMessage());
+      }
+    }
     numUpdatedPartitions.setRef(0L);
     if (modifiedParts != null) {
       numUpdatedPartitions.setRef((long) modifiedParts.size());
