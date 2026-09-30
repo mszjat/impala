@@ -456,6 +456,30 @@ public class BuiltinsDb extends Db {
             "13DsThetaUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .build();
 
+  // Update symbols for the internal Iceberg (Appendix D) theta flavor used by
+  // ds_theta_sketch_iceberg during COMPUTE STATS. BOOLEAN/INT/FLOAT/DATE use the
+  // Appendix D encoding (DsThetaUpdateIceberg); the remaining types reuse the default
+  // DsThetaUpdate symbols, which already encode identically. TINYINT/SMALLINT are
+  // intentionally omitted: Iceberg has no such column types (IcebergSchemaConverter maps
+  // both to INT), and a stray narrow value would implicitly widen to INT and get the
+  // correct 4-byte encoding.
+  private static final Map<Type, String> DS_THETA_ICEBERG_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.BOOLEAN,
+            "20DsThetaUpdateIcebergIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.INT,
+            "20DsThetaUpdateIcebergIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.BIGINT, DS_THETA_UPDATE_SYMBOL.get(Type.BIGINT))
+        .put(Type.FLOAT,
+            "20DsThetaUpdateIcebergIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.DOUBLE, DS_THETA_UPDATE_SYMBOL.get(Type.DOUBLE))
+        .put(Type.STRING, DS_THETA_UPDATE_SYMBOL.get(Type.STRING))
+        .put(Type.TIMESTAMP, DS_THETA_UPDATE_SYMBOL.get(Type.TIMESTAMP))
+        .put(Type.DATE,
+            "20DsThetaUpdateIcebergIN10impala_udf7DateValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+        .put(Type.DECIMAL, DS_THETA_UPDATE_SYMBOL.get(Type.DECIMAL))
+        .build();
+
   private static final Map<Type, String> SAMPLED_NDV_UPDATE_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
@@ -1254,6 +1278,20 @@ public class BuiltinsDb extends Db {
                 prefix + "16DsThetaSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
                 prefix + "21DsThetaFinalizeSketchEPN10impala_udf15FunctionContextERKNS1_" +
                         "9StringValE", true, false, true));
+
+        // Internal-only flavor used by COMPUTE STATS on Iceberg tables. Same lifecycle as
+        // ds_theta_sketch but encodes values with Iceberg Appendix D serialization. Not
+        // registered for TINYINT/SMALLINT (absent from DS_THETA_ICEBERG_UPDATE_SYMBOL).
+        if (DS_THETA_ICEBERG_UPDATE_SYMBOL.containsKey(t)) {
+          db.addBuiltin(AggregateFunction.createBuiltin(db, "ds_theta_sketch_iceberg",
+                  Lists.newArrayList(t), Type.BINARY, Type.BINARY,
+                  prefix + "11DsThetaInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+                  prefix + DS_THETA_ICEBERG_UPDATE_SYMBOL.get(t),
+                  prefix + "12DsThetaMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+                  prefix + "16DsThetaSerializeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+                  prefix + "21DsThetaFinalizeSketchEPN10impala_udf15FunctionContextERKNS1_" +
+                          "9StringValE", true, false, true));
+        }
       } else {
         db.addBuiltin(AggregateFunction.createUnsupportedBuiltin(db,
                 "ds_theta_sketch_and_estimate", Lists.newArrayList(t), Type.STRING,

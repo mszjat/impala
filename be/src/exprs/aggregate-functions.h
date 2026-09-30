@@ -343,6 +343,13 @@ class AggregateFunctions {
   static void DsThetaInit(FunctionContext*, StringVal* slot);
   template <typename T>
   static void DsThetaUpdate(FunctionContext*, const T& src, StringVal* dst);
+  /// Update variant used by COMPUTE STATS on Iceberg tables: encodes each value with
+  /// Iceberg Appendix D single-value serialization instead of the DataSketches typed
+  /// overloads, so the sketches match those written by Trino/Spark. Only specialized for
+  /// the types where the two encodings differ (BOOLEAN, INT, FLOAT, DATE); the other
+  /// Iceberg column types reuse DsThetaUpdate, which already encodes identically.
+  template <typename T>
+  static void DsThetaUpdateIceberg(FunctionContext*, const T& src, StringVal* dst);
   static StringVal DsThetaSerialize(FunctionContext*, const StringVal& src);
   static void DsThetaMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static BigIntVal DsThetaFinalize(FunctionContext*, const StringVal& src);

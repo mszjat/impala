@@ -2771,6 +2771,71 @@ void AggregateFunctions::DsThetaUpdate(
   sketch_ptr->update(reinterpret_cast<char*>(src.ptr), src.len);
 }
 
+// DsThetaUpdateIceberg specializations: encode values with Iceberg Appendix D
+// single-value serialization so the resulting sketches match Trino/Spark. Only the four
+// types whose Appendix D encoding differs from the DataSketches typed overloads are
+// specialized here; the other Iceberg column types reuse DsThetaUpdate (identical bytes).
+
+// BOOLEAN: single byte (0x00/0x01). The typed overload would widen it to 8 bytes.
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const BooleanVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(agg_state));
+  auto agg_state_ptr = reinterpret_cast<agg_state*>(dst->ptr);
+  DCHECK_EQ(agg_state_ptr->first, agg_phase::UPDATE);
+  auto sketch_ptr =
+      reinterpret_cast<datasketches::update_theta_sketch*>(agg_state_ptr->second);
+  uint8_t byte = src.val ? 1 : 0;
+  sketch_ptr->update(&byte, sizeof(byte));
+}
+
+// INT: 4-byte little-endian. The typed overload would widen it to 8 bytes.
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const IntVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(agg_state));
+  auto agg_state_ptr = reinterpret_cast<agg_state*>(dst->ptr);
+  DCHECK_EQ(agg_state_ptr->first, agg_phase::UPDATE);
+  auto sketch_ptr =
+      reinterpret_cast<datasketches::update_theta_sketch*>(agg_state_ptr->second);
+  int32_t val = src.val;
+  sketch_ptr->update(&val, sizeof(val));
+}
+
+// FLOAT: 4-byte little-endian IEEE-754. The typed overload would widen it to a double.
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const FloatVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(agg_state));
+  auto agg_state_ptr = reinterpret_cast<agg_state*>(dst->ptr);
+  DCHECK_EQ(agg_state_ptr->first, agg_phase::UPDATE);
+  auto sketch_ptr =
+      reinterpret_cast<datasketches::update_theta_sketch*>(agg_state_ptr->second);
+  float val = src.val;
+  sketch_ptr->update(&val, sizeof(val));
+}
+
+// DATE: 4-byte little-endian day count. The typed overload would widen it to 8 bytes.
+template <>
+void AggregateFunctions::DsThetaUpdateIceberg(
+    FunctionContext* ctx, const DateVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(agg_state));
+  auto agg_state_ptr = reinterpret_cast<agg_state*>(dst->ptr);
+  DCHECK_EQ(agg_state_ptr->first, agg_phase::UPDATE);
+  auto sketch_ptr =
+      reinterpret_cast<datasketches::update_theta_sketch*>(agg_state_ptr->second);
+  int32_t val = src.val;
+  sketch_ptr->update(&val, sizeof(val));
+}
+
 // Specialize for TimestampVal: encode as microseconds since epoch per Iceberg
 // single-value serialization (Appendix D: timestamp → 8-byte little-endian int64).
 template <>
@@ -4180,6 +4245,8 @@ template void AggregateFunctions::DsThetaUpdate(
 template void AggregateFunctions::DsThetaUpdate(
     FunctionContext*, const DateVal&, StringVal*);
 // TimestampVal and DecimalVal use explicit specialisations above; no template keyword.
+// DsThetaUpdateIceberg is specialised only for BooleanVal, IntVal, FloatVal and DateVal
+// (above); the other Iceberg column types reuse DsThetaUpdate.
 
 
 template void AggregateFunctions::SampledNdvUpdate(

@@ -606,3 +606,24 @@ BIGINT
 ---- RESULTS
 5
 ====
+---- QUERY
+# ds_theta_sketch_iceberg() encodes each value with Iceberg Appendix D single-value
+# serialization (INT as 4 bytes), whereas ds_theta_sketch() widens INT to an 8-byte hash
+# input (matching Hive and BIGINT). So INT and BIGINT sketches of the same values are
+# identical under the default flavor (A-not-B estimate 0) but disjoint under the Iceberg
+# flavor (A-not-B estimate = number of distinct values).
+create table theta_flavor_enc
+    (d_int binary, d_bigint binary, i_int binary, i_bigint binary) stored as parquet;
+insert into theta_flavor_enc select
+    ds_theta_sketch(cast(id as int)), ds_theta_sketch(cast(id as bigint)),
+    ds_theta_sketch_iceberg(cast(id as int)), ds_theta_sketch_iceberg(cast(id as bigint))
+from functional_parquet.alltypestiny;
+select
+    ds_theta_estimate(ds_theta_exclude(d_int, d_bigint)),
+    ds_theta_estimate(ds_theta_exclude(i_int, i_bigint))
+from theta_flavor_enc;
+---- TYPES
+BIGINT,BIGINT
+---- RESULTS
+0,8
+====
