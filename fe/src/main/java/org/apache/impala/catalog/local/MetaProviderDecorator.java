@@ -91,6 +91,10 @@ public abstract class MetaProviderDecorator implements MetaProvider {
     return this.decoratedObj_.getCatalogRef(dbName, tableName);
   }
 
+  public CatalogRef getDbCatalogRef(String dbName) throws TException {
+    return this.decoratedObj_.getDbCatalogRef(dbName);
+  }
+
   public ImmutableCollection<TBriefTableMeta> loadTableList(String dbName)
       throws MetaException, UnknownDBException, TException {
     return this.decoratedObj_.loadTableList(dbName);
