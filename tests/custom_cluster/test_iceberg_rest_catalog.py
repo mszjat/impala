@@ -293,6 +293,9 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
           self.client, "drop database {}".format(namespace))
       assert expected in str(error)
       assert requests.get(namespace_url, timeout=30).status_code == 200
+      error = self.execute_query_expect_failure(self.client,
+          "create table {}.tbl (i int) stored as iceberg".format(namespace))
+      assert expected in str(error)
     finally:
       requests.delete(namespace_url, timeout=30)
 
@@ -336,6 +339,60 @@ class IcebergRestCatalogTests(CustomClusterTestSuite):
           self.client, "drop database {}".format(namespace))
       assert "Database does not exist: {}".format(namespace) in str(error)
     finally:
+      requests.delete(namespace_url, timeout=30)
+
+  def _run_rest_create_table_test(self, server):
+    """CREATE TABLE in a namespace of a REST catalog runs in the coordinator through
+    the REST catalog. Only Iceberg tables are accepted there."""
+    namespace = "impala_rest_create_tbl_test"
+    table_name = "{}.tbl".format(namespace)
+    namespace_url = self._rest_namespace_url(server, namespace)
+    requests.post("http://localhost:{}/v1/namespaces".format(server.port),
+        json={'namespace': [namespace], 'properties': {}}, timeout=30)
+    try:
+      result = self.execute_query_expect_success(self.client,
+          "create table {} (i int, p int) partitioned by spec (p) sort by (i) "
+          "comment 'a comment' stored as iceberg "
+          "tblproperties ('format-version'='2', 'k'='v')".format(table_name.upper()))
+      assert result.data == ['Table has been created.']
+      response = requests.get(self._rest_table_url(server, table_name), timeout=30)
+      assert response.status_code == 200
+      metadata = response.json()['metadata']
+      assert metadata['format-version'] == 2
+      properties = metadata['properties']
+      assert properties['k'] == 'v'
+      assert properties['comment'] == 'a comment'
+      assert properties['sort.columns'] == 'i'
+      spec = [s for s in metadata['partition-specs']
+          if s['spec-id'] == metadata['default-spec-id']][0]
+      assert [(f['name'], f['transform']) for f in spec['fields']] == \
+          [('p', 'identity')]
+
+      self.execute_query_expect_success(
+          self.client, "insert into {} values (1, 10), (2, 20)".format(table_name))
+      result = self.execute_query_expect_success(
+          self.client, "select i, p from {} order by i".format(table_name))
+      assert result.data == ['1\t10', '2\t20']
+
+      result = self.execute_query_expect_success(self.client,
+          "create table if not exists {} (i int) stored as iceberg".format(table_name))
+      assert result.data == ['Table already exists.']
+      error = self.execute_query_expect_failure(self.client,
+          "create table {} (i int) stored as iceberg".format(table_name))
+      assert "Table already exists: {}".format(table_name) in str(error)
+      error = self.execute_query_expect_failure(self.client,
+          "create table {}.parq (i int) stored as parquet".format(namespace))
+      assert "Only Iceberg tables can be created in Iceberg REST catalogs" \
+          in str(error)
+      error = self.execute_query_expect_failure(self.client,
+          "create table {}.cat (i int) stored as iceberg "
+          "tblproperties ('iceberg.catalog'='hive.catalog')".format(namespace))
+      assert "Table property 'iceberg.catalog' is not supported" in str(error)
+
+      self.execute_query_expect_success(
+          self.client, "drop table {} purge".format(table_name))
+    finally:
+      self._drop_rest_test_table(server, table_name)
       requests.delete(namespace_url, timeout=30)
 
   @classmethod
@@ -507,6 +564,38 @@ class TestIcebergRestCatalogWithHms(IcebergRestCatalogTests):
     result = self.execute_query_expect_success(
         self.client, "drop database {}".format(db_name))
     assert result.data == ['Database has been dropped.']
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=MULTICATALOG_IMPALAD_ARGS,
+     catalogd_args=MULTICATALOG_CATALOGD_ARGS)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_create_table(self):
+    """With catalogd deployed, CREATE TABLE in a REST namespace runs in the
+    coordinator, and in a database of catalogd in catalogd. A database that both have
+    is ambiguous."""
+    server = self.servers[0]
+    self._run_rest_create_table_test(server)
+
+    db_name = "impala_rest_hms_create_tbl_test"
+    namespace_url = self._rest_namespace_url(server, db_name)
+    self._create_hms_database(db_name)
+    try:
+      result = self.execute_query_expect_success(
+          self.client, "create table {}.hms_tbl (i int)".format(db_name))
+      assert result.data == ['Table has been created.']
+      requests.post("http://localhost:{}/v1/namespaces".format(server.port),
+          json={'namespace': [db_name], 'properties': {}}, timeout=30)
+      try:
+        error = self.execute_query_expect_failure(self.client,
+            "create table {}.tbl (i int) stored as iceberg".format(db_name))
+        assert "Ambiguous database name: {}".format(db_name) in str(error)
+      finally:
+        requests.delete(namespace_url, timeout=30)
+    finally:
+      self.execute_query_expect_success(
+          self.client, "drop database {} cascade".format(db_name))
 
   @RestServerProperties(
     {'port': 9084},
@@ -947,6 +1036,19 @@ class TestIcebergRestCatalogStandalone(IcebergRestCatalogTests):
   @pytest.mark.execute_serially
   def test_rest_catalog_drop_database(self):
     self._run_rest_drop_database_test(self.servers[0])
+
+  @RestServerProperties(
+      {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION})
+  @CustomClusterTestSuite.with_args(
+     impalad_args=REST_STANDALONE_IMPALAD_ARGS,
+     start_args=NO_CATALOGD_STARTARGS,
+     cluster_size=1)
+  @pytest.mark.execute_serially
+  def test_rest_catalog_create_table(self):
+    self._run_rest_create_table_test(self.servers[0])
+    error = self.execute_query_expect_failure(
+        self.client, "create table no_such_db.tbl (i int) stored as iceberg")
+    assert "Database does not exist: no_such_db" in str(error)
 
   @RestServerProperties(
       {'port': 9084, 'catalog_location': WRITE_TEST_CATALOG_LOCATION})

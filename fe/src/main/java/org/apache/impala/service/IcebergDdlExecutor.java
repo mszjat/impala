@@ -21,9 +21,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
+import org.apache.impala.analysis.AlterTableSortByStmt;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.TableNotFoundException;
 import org.apache.impala.common.ImpalaException;
@@ -31,15 +36,19 @@ import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.catalogmanager.FeCatalogManager;
 import org.apache.impala.thrift.TCatalogUpdateResult;
 import org.apache.impala.thrift.TCreateDbParams;
+import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TDropDbParams;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TErrorCode;
 import org.apache.impala.thrift.TIcebergDdlExecRequest;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TStatus;
 import org.apache.impala.thrift.TUniqueId;
 import org.apache.impala.util.CatalogBlacklistUtils;
+import org.apache.impala.util.IcebergSchemaConverter;
+import org.apache.impala.util.IcebergUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,9 +65,10 @@ import com.google.common.base.Preconditions;
  * these tables, so nothing is cached for them on the coordinator and the returned
  * TDdlExecResponse carries no catalog version to wait for.
  *
- * <p>Supported DDL: DROP TABLE, DROP VIEW IF EXISTS as its no-op counterpart, and
- * CREATE / DROP DATABASE (DROP without CASCADE). Other DDL types are rejected here,
- * and the analyzer refuses them for REST-backed tables before they get this far.
+ * <p>Supported DDL: CREATE TABLE (Iceberg), DROP TABLE, DROP VIEW IF EXISTS as its
+ * no-op counterpart, and CREATE / DROP DATABASE (DROP without CASCADE). Other DDL
+ * types are rejected here, and the analyzer refuses them for REST-backed tables
+ * before they get this far.
  */
 final class IcebergDdlExecutor {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergDdlExecutor.class);
@@ -83,6 +93,9 @@ final class IcebergDdlExecutor {
         break;
       case CREATE_DATABASE:
         createDatabase(catalogManager, catalogName, ddl.getCreate_db_params(), response);
+        break;
+      case CREATE_TABLE:
+        createTable(catalogManager, catalogName, ddl.getCreate_table_params(), response);
         break;
       default:
         throw new ImpalaRuntimeException(String.format(
@@ -232,5 +245,54 @@ final class IcebergDdlExecutor {
     }
     LOG.info("Created database {} through Iceberg REST catalog {}", dbName, catalogName);
     CatalogOpExecutor.addSummary(response, "Database has been created.");
+  }
+
+  /**
+   * Creates an Iceberg table through its REST catalog. The table properties are the
+   * ones CatalogD passes to Iceberg, including the comment and the sort columns.
+   * Without LOCATION the REST server picks the location. The owner is not set: REST
+   * catalogs have no owner.
+   */
+  private static void createTable(FeCatalogManager catalogManager, String catalogName,
+      TCreateTableParams params, TDdlExecResponse response) throws ImpalaException {
+    Preconditions.checkNotNull(params, "Missing CREATE TABLE parameters");
+    String dbName = params.getTable_name().getDb_name().toLowerCase();
+    String tblName = params.getTable_name().getTable_name().toLowerCase();
+    if (CatalogBlacklistUtils.isDbBlacklisted(dbName)
+        || CatalogBlacklistUtils.isTableBlacklisted(dbName, tblName)) {
+      throw new ImpalaRuntimeException(String.format(
+          "Can't create blacklisted table: %s.%s", dbName, tblName));
+    }
+    Map<String, String> properties = new HashMap<>();
+    if (params.isSetTable_properties()) properties.putAll(params.getTable_properties());
+    if (params.isSetSort_columns() && !params.getSort_columns().isEmpty()) {
+      properties.put(AlterTableSortByStmt.TBL_PROP_SORT_COLUMNS,
+          String.join(",", params.getSort_columns()));
+      properties.put(AlterTableSortByStmt.TBL_PROP_SORT_ORDER,
+          params.isSetSorting_order() ? params.getSorting_order().toString()
+              : TSortingOrder.LEXICAL.toString());
+    }
+    if (params.isSetComment()) properties.put("comment", params.getComment());
+    Schema schema = IcebergSchemaConverter.genIcebergSchema(params.getColumns(),
+        params.getPrimary_key_column_names());
+    PartitionSpec spec =
+        IcebergUtil.createIcebergPartition(schema, params.getPartition_spec());
+    try {
+      catalogManager.getIcebergCatalog(catalogName).createTable(
+          TableIdentifier.of(Namespace.of(dbName), tblName), schema, spec,
+          params.getLocation(), properties);
+    } catch (AlreadyExistsException e) {
+      if (!params.if_not_exists) {
+        throw new ImpalaRuntimeException(String.format(
+            "Table already exists: %s.%s", dbName, tblName), e);
+      }
+      CatalogOpExecutor.addSummary(response, "Table already exists.");
+      return;
+    } catch (NoSuchNamespaceException e) {
+      throw new DatabaseNotFoundException("Database does not exist: " + dbName);
+    }
+    LOG.info("Created table {}.{} through Iceberg REST catalog {}", dbName, tblName,
+        catalogName);
+    CatalogOpExecutor.addSummary(response, "Table has been created.");
   }
 }

@@ -20,24 +20,34 @@ package org.apache.impala.service;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.impala.catalog.DatabaseNotFoundException;
 import org.apache.impala.catalog.TableNotFoundException;
+import org.apache.impala.catalog.Type;
 import org.apache.impala.catalog.iceberg.IcebergRESTCatalog;
 import org.apache.impala.common.ImpalaRuntimeException;
 import org.apache.impala.service.catalogmanager.FeCatalogManager;
 import org.apache.impala.thrift.TBackendGflags;
+import org.apache.impala.thrift.TColumn;
 import org.apache.impala.thrift.TCreateDbParams;
+import org.apache.impala.thrift.TCreateTableParams;
 import org.apache.impala.thrift.TDdlExecRequest;
 import org.apache.impala.thrift.TDdlExecResponse;
 import org.apache.impala.thrift.TDdlQueryOptions;
@@ -45,14 +55,18 @@ import org.apache.impala.thrift.TDdlType;
 import org.apache.impala.thrift.TDropDbParams;
 import org.apache.impala.thrift.TDropTableOrViewParams;
 import org.apache.impala.thrift.TErrorCode;
+import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.thrift.TIcebergDdlExecRequest;
+import org.apache.impala.thrift.TSortingOrder;
 import org.apache.impala.thrift.TTableName;
 import org.apache.impala.util.CatalogBlacklistUtilsTest;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 /**
@@ -335,6 +349,74 @@ public class IcebergDdlExecutorTest {
   }
 
   @Test
+  public void testCreateTable() throws Exception {
+    TIcebergDdlExecRequest request = createTableRequest(/*ifNotExists=*/false);
+    TCreateTableParams params = request.getDdl_params().getCreate_table_params();
+    params.setTable_name(new TTableName("Db", "TBL"));
+    params.setComment("c");
+    params.setTable_properties(ImmutableMap.of("k", "v"));
+    params.setSort_columns(ImmutableList.of("i"));
+    params.setSorting_order(TSortingOrder.ZORDER);
+
+    TDdlExecResponse response = IcebergDdlExecutor.execDdl(catalogManager_, request);
+
+    ArgumentCaptor<Schema> schema = ArgumentCaptor.forClass(Schema.class);
+    verify(restCatalog_).createTable(
+        eq(TableIdentifier.of(Namespace.of(DB_NAME), TBL_NAME)), schema.capture(),
+        eq(PartitionSpec.unpartitioned()), isNull(),
+        eq(ImmutableMap.of("k", "v", "comment", "c", "sort.columns", "i",
+            "sort.order", "ZORDER")));
+    assertEquals("i", schema.getValue().columns().get(0).name());
+    assertEquals("Table has been created.", summary(response));
+    assertEquals(0, response.getResult().getVersion());
+  }
+
+  @Test
+  public void testCreateExistingTable() throws Exception {
+    when(restCatalog_.createTable(any(), any(), any(), any(), any()))
+        .thenThrow(new AlreadyExistsException("Table already exists: %s", TBL_NAME));
+
+    TDdlExecResponse response = IcebergDdlExecutor.execDdl(
+        catalogManager_, createTableRequest(/*ifNotExists=*/true));
+    assertEquals("Table already exists.", summary(response));
+
+    try {
+      IcebergDdlExecutor.execDdl(
+          catalogManager_, createTableRequest(/*ifNotExists=*/false));
+      fail("Expected an existing table to be rejected without IF NOT EXISTS");
+    } catch (ImpalaRuntimeException e) {
+      assertTrue(e.getMessage(),
+          e.getMessage().contains("Table already exists: db.tbl"));
+    }
+  }
+
+  @Test
+  public void testCreateTableInMissingDatabase() throws Exception {
+    when(restCatalog_.createTable(any(), any(), any(), any(), any()))
+        .thenThrow(new NoSuchNamespaceException("Namespace does not exist: " + DB_NAME));
+    try {
+      IcebergDdlExecutor.execDdl(
+          catalogManager_, createTableRequest(/*ifNotExists=*/true));
+      fail("Expected a missing database to be rejected");
+    } catch (DatabaseNotFoundException e) {
+      assertTrue(e.getMessage().contains("Database does not exist: " + DB_NAME));
+    }
+  }
+
+  @Test
+  public void testCreateBlacklistedTable() throws Exception {
+    CatalogBlacklistUtilsTest.setBlacklist("", DB_NAME + "." + TBL_NAME);
+    try {
+      IcebergDdlExecutor.execDdl(
+          catalogManager_, createTableRequest(/*ifNotExists=*/true));
+      fail("Expected a blacklisted table to be rejected");
+    } catch (ImpalaRuntimeException e) {
+      assertTrue(e.getMessage().contains("Can't create blacklisted table: db.tbl"));
+    }
+    verify(restCatalog_, never()).createTable(any(), any(), any(), any(), any());
+  }
+
+  @Test
   public void testUnknownCatalog() throws Exception {
     when(catalogManager_.getIcebergCatalog(CATALOG_NAME))
         .thenThrow(new ImpalaRuntimeException("Unknown Iceberg REST catalog: rest-1"));
@@ -384,6 +466,22 @@ public class IcebergDdlExecutorTest {
     TDdlExecRequest ddl = new TDdlExecRequest();
     ddl.setDdl_type(TDdlType.CREATE_DATABASE);
     ddl.setCreate_db_params(params);
+    ddl.setQuery_options(new TDdlQueryOptions(false));
+    TIcebergDdlExecRequest request = new TIcebergDdlExecRequest();
+    request.setRest_catalog_name(CATALOG_NAME);
+    request.setDdl_params(ddl);
+    return request;
+  }
+
+  private static TIcebergDdlExecRequest createTableRequest(boolean ifNotExists) {
+    TCreateTableParams params = new TCreateTableParams();
+    params.setTable_name(new TTableName(DB_NAME, TBL_NAME));
+    params.setColumns(ImmutableList.of(new TColumn("i", Type.INT.toThrift())));
+    params.setFile_format(THdfsFileFormat.ICEBERG);
+    params.setIf_not_exists(ifNotExists);
+    TDdlExecRequest ddl = new TDdlExecRequest();
+    ddl.setDdl_type(TDdlType.CREATE_TABLE);
+    ddl.setCreate_table_params(params);
     ddl.setQuery_options(new TDdlQueryOptions(false));
     TIcebergDdlExecRequest request = new TIcebergDdlExecRequest();
     request.setRest_catalog_name(CATALOG_NAME);

@@ -26,15 +26,19 @@ import javax.annotation.Nullable;
 import org.apache.impala.analysis.AnalysisContext.AnalysisResult;
 import org.apache.impala.analysis.Analyzer;
 import org.apache.impala.analysis.CreateDbStmt;
+import org.apache.impala.analysis.CreateTableStmt;
 import org.apache.impala.analysis.DropDbStmt;
 import org.apache.impala.analysis.DropTableOrViewStmt;
 import org.apache.impala.catalog.CatalogRef;
+import org.apache.impala.catalog.FeDb;
 import org.apache.impala.catalog.FeIcebergTable;
 import org.apache.impala.catalog.FeTable;
+import org.apache.impala.catalog.IcebergTable;
 import org.apache.impala.catalog.TableLoadingException;
 import org.apache.impala.catalog.local.LocalCatalogException;
 import org.apache.impala.common.AnalysisException;
 import org.apache.impala.thrift.TDdlType;
+import org.apache.impala.thrift.THdfsFileFormat;
 import org.apache.impala.util.CatalogBlacklistUtils;
 
 import com.google.common.base.Preconditions;
@@ -98,6 +102,9 @@ final class IcebergRestDdlRouter {
     }
     if (analysis.isCreateDbStmt()) {
       return routeCreateDb(analysis.getAnalyzer(), analysis.getCreateDbStmt());
+    }
+    if (analysis.isCreateTableStmt()) {
+      return routeCreateTable(analysis.getAnalyzer(), analysis.getCreateTableStmt());
     }
     return Route.CATALOGD;
   }
@@ -225,6 +232,51 @@ final class IcebergRestDdlRouter {
     if (stmt.hasManagedLocation()) {
       throw new AnalysisException(
           "MANAGEDLOCATION is not supported on Iceberg REST catalogs: " + dbName);
+    }
+    return Route.restCatalog(catalogRef.getRestCatalogName());
+  }
+
+  /**
+   * Routes CREATE TABLE [IF NOT EXISTS] to the catalog that serves its database now.
+   * The statement is rejected when that catalog cannot be decided, e.g. because several
+   * catalogs list the database. In a database served by a REST catalog:
+   * - IF NOT EXISTS on an existing table is a no-op, with the summary CatalogD gives.
+   * - otherwise the table is created through the REST catalog, which needs a unique
+   *   name. Only Iceberg tables are accepted, without 'iceberg.catalog', as the REST
+   *   catalog is the Iceberg catalog, and without foreign keys.
+   */
+  private static Route routeCreateTable(Analyzer analyzer, CreateTableStmt stmt)
+      throws AnalysisException {
+    String dbName = stmt.getDb().toLowerCase();
+    String tblName = stmt.getTbl().toLowerCase();
+    String fullName = dbName + "." + tblName;
+    CatalogRef catalogRef;
+    try {
+      catalogRef = analyzer.getCatalog().getDbCatalogRef(dbName);
+    } catch (LocalCatalogException e) {
+      throw new AnalysisException(e.getMessage(), e);
+    }
+    if (!catalogRef.isRest()) return Route.CATALOGD;
+    FeDb db = analyzer.getCatalog().getDb(dbName);
+    if (db != null && db.containsTable(tblName)) {
+      Preconditions.checkState(stmt.getIfNotExists());
+      return Route.noOp("Table already exists.");
+    }
+    if (catalogRef.getRestCatalogName() == null) {
+      throw Analyzer.restCatalogNotUnique(TDdlType.CREATE_TABLE, fullName);
+    }
+    if (stmt.getFileFormat() != THdfsFileFormat.ICEBERG) {
+      throw new AnalysisException(
+          "Only Iceberg tables can be created in Iceberg REST catalogs: " + fullName);
+    }
+    if (stmt.getTblProperties().containsKey(IcebergTable.ICEBERG_CATALOG)) {
+      throw new AnalysisException(String.format(
+          "Table property '%s' is not supported on Iceberg REST catalogs: %s",
+          IcebergTable.ICEBERG_CATALOG, fullName));
+    }
+    if (!stmt.getForeignKeys().isEmpty()) {
+      throw new AnalysisException(
+          "Foreign keys are not supported on Iceberg REST catalogs: " + fullName);
     }
     return Route.restCatalog(catalogRef.getRestCatalogName());
   }

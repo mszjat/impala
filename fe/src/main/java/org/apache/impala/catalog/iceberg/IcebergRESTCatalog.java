@@ -63,6 +63,10 @@ public class IcebergRESTCatalog implements IcebergCatalog {
     return REST_URI;
   }
 
+  /**
+   * Creates the table through the REST catalog. Without 'location' the server picks
+   * it. Throws AlreadyExistsException if the table exists.
+   */
   @Override
   public Table createTable(
       TableIdentifier identifier,
@@ -70,8 +74,7 @@ public class IcebergRESTCatalog implements IcebergCatalog {
       PartitionSpec spec,
       String location,
       Map<String, String> properties) {
-    throw new UnsupportedOperationException(
-        "CREATE TABLE is not implemented for REST catalog");
+    return restCatalog_.createTable(identifier, schema, spec, location, properties);
   }
 
   public ImmutableList<String> listNamespaces() {
