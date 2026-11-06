@@ -73,6 +73,7 @@ public class CreateDbStmt extends StatementBase {
   public String getParsedDb() { return dbName_; }
   public String getDb() { return dbName_; }
   public boolean getIfNotExists() { return ifNotExists_; }
+  public boolean hasManagedLocation() { return managedLocation_ != null; }
 
   @Override
   public String toSql(ToSqlOptions options) {
@@ -108,6 +109,10 @@ public class CreateDbStmt extends StatementBase {
       throw new AnalysisException("Invalid database name: " + dbName_);
     }
     CatalogBlacklistUtils.verifyDbName(dbName_);
+    if (analyzer.getCatalog().isMultiCatalog()) {
+      throw new AnalysisException("CREATE DATABASE is not supported with several " +
+          "catalogs, as the catalog to create it in is ambiguous: " + dbName_);
+    }
 
     // Note: It is possible that a database with the same name was created external to
     // this Impala instance. If that happens, the caller will not get an
